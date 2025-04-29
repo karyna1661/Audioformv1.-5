@@ -4,19 +4,26 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, Square, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { uploadAudio } from "@/utils/supabase/storage"
 
 interface RecordButtonProps {
-  onRecordingComplete: (audioBlob: Blob) => void
+  onRecordingComplete: (audioBlob: Blob, audioUrl?: string) => void
+  onRecordingStart?: () => void
   className?: string
   variant?: "default" | "outline" | "secondary" | "ghost" | "link" | "destructive"
   size?: "default" | "sm" | "lg" | "icon"
+  surveyId?: string
+  questionId?: string
 }
 
 export function RecordButton({
   onRecordingComplete,
+  onRecordingStart,
   className,
   variant = "default",
   size = "default",
+  surveyId,
+  questionId,
 }: RecordButtonProps) {
   const [recordingState, setRecordingState] = useState<"idle" | "recording" | "stopping" | "processing" | "completed">(
     "idle",
@@ -50,6 +57,7 @@ export function RecordButton({
       streamRef.current = stream
 
       // Set up audio context and analyser for visualization
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext
       const audioContext = new AudioContext()
       audioContextRef.current = audioContext
       const analyser = audioContext.createAnalyser()
@@ -71,10 +79,40 @@ export function RecordButton({
         }
       }
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         setRecordingState("processing")
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
-        onRecordingComplete(audioBlob)
+
+        // If surveyId is provided, upload to Supabase
+        let audioUrl
+        if (surveyId) {
+          try {
+            const fileName = `${surveyId}_${questionId || "q"}_${Date.now()}.webm`
+            const filePath = `${surveyId}/${fileName}`
+
+            // Convert blob to file
+            const file = new File([audioBlob], fileName, {
+              type: audioBlob.type,
+            })
+
+            audioUrl = await uploadAudio(file, filePath)
+
+            // Insert response record if this is a survey response
+            if (questionId) {
+              // This would typically be done in a server action or API route
+              // For now, we'll just log it
+              console.log("Would save response record for:", {
+                surveyId,
+                questionId,
+                audioPath: filePath,
+              })
+            }
+          } catch (error) {
+            console.error("Error uploading audio:", error)
+          }
+        }
+
+        onRecordingComplete(audioBlob, audioUrl)
         setRecordingState("completed")
 
         // Clean up
@@ -89,6 +127,9 @@ export function RecordButton({
       // Start recording
       mediaRecorder.start()
       setRecordingState("recording")
+      if (onRecordingStart) {
+        onRecordingStart()
+      }
 
       // Start visualization
       drawWaveform()

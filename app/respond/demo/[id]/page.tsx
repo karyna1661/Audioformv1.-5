@@ -11,6 +11,7 @@ import { useMobile } from "@/hooks/use-mobile"
 import { ArrowLeft, ArrowRight, CheckCircle, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
+import { supabase } from "@/lib/supabaseClient"
 
 interface SurveyQuestion {
   id: string
@@ -43,31 +44,40 @@ export default function RespondDemoPage({ params }: { params: { id: string } }) 
   const [submitting, setSubmitting] = useState(false)
   const [completed, setCompleted] = useState(false)
 
-  // Mock fetch survey data
+  // Fetch survey data from Supabase
   useEffect(() => {
     const fetchSurvey = async () => {
       try {
-        // In a real app, this would be an API call
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        setLoading(true)
 
-        // Mock data
-        const mockSurvey: SurveyData = {
+        // Get survey from Supabase
+        const { data: surveyData, error: surveyError } = await supabase
+          .from("surveys")
+          .select("*")
+          .eq("id", surveyId)
+          .single()
+
+        if (surveyError) throw surveyError
+
+        // Check if survey is expired
+        const now = new Date()
+        const expiry = new Date(surveyData.expires_at)
+        const isExpired = now >= expiry
+
+        // Create survey object
+        const surveyObj: SurveyData = {
           id: surveyId,
-          title: "Customer Feedback Demo",
-          questions: [
-            { id: "1", text: "How would you describe your experience with our product?" },
-            { id: "2", text: "What features do you find most valuable?" },
-            { id: "3", text: "How can we improve our product to better meet your needs?" },
-          ],
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 23).toISOString(), // 23 hours from now
-          isExpired: false,
+          title: surveyData.title || "Demo Survey",
+          questions: surveyData.questions || [],
+          expiresAt: surveyData.expires_at,
+          isExpired,
         }
 
-        setSurvey(mockSurvey)
+        setSurvey(surveyObj)
 
         // Initialize responses object
         const initialResponses: Record<string, Blob | null> = {}
-        mockSurvey.questions.forEach((q) => {
+        surveyObj.questions.forEach((q) => {
           initialResponses[q.id] = null
         })
         setResponses(initialResponses)
@@ -107,15 +117,15 @@ export default function RespondDemoPage({ params }: { params: { id: string } }) 
     return () => clearInterval(interval)
   }, [survey])
 
-  const handleRecordingComplete = (questionId: string, audioBlob: Blob) => {
+  const handleRecordingComplete = async (questionId: string, audioBlob: Blob, audioUrl?: string) => {
     // Update responses
     setResponses((prev) => ({
       ...prev,
       [questionId]: audioBlob,
     }))
 
-    // Create URL for playback
-    const url = URL.createObjectURL(audioBlob)
+    // If we have a URL from Supabase, use it, otherwise create a local URL
+    const url = audioUrl || URL.createObjectURL(audioBlob)
     setAudioUrls((prev) => ({
       ...prev,
       [questionId]: url,
@@ -159,9 +169,25 @@ export default function RespondDemoPage({ params }: { params: { id: string } }) 
         return
       }
 
-      // In a real app, this would upload each audio blob to storage
-      // and then submit the response data to the API
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Update email for all responses in Supabase
+      for (const question of survey.questions) {
+        if (responses[question.id]) {
+          // Find the response in Supabase by survey_id and question_id
+          const { data: responseData } = await supabase
+            .from("responses")
+            .select("id")
+            .eq("survey_id", surveyId)
+            .eq("question_id", question.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single()
+
+          if (responseData) {
+            // Update the email
+            await supabase.from("responses").update({ email }).eq("id", responseData.id)
+          }
+        }
+      }
 
       setCompleted(true)
     } catch (err) {
@@ -254,8 +280,10 @@ export default function RespondDemoPage({ params }: { params: { id: string } }) 
 
           {!audioUrls[question.id] ? (
             <RecordButton
-              onRecordingComplete={(audioBlob) => handleRecordingComplete(question.id, audioBlob)}
+              onRecordingComplete={(audioBlob, audioUrl) => handleRecordingComplete(question.id, audioBlob, audioUrl)}
               className="w-full"
+              surveyId={surveyId}
+              questionId={question.id}
             />
           ) : (
             <div className="flex flex-col items-center">
@@ -267,7 +295,9 @@ export default function RespondDemoPage({ params }: { params: { id: string } }) 
                   setResponses((prev) => ({ ...prev, [question.id]: null }))
 
                   // Revoke the object URL to avoid memory leaks
-                  URL.revokeObjectURL(audioUrls[question.id])
+                  if (!audioUrls[question.id].includes("supabase")) {
+                    URL.revokeObjectURL(audioUrls[question.id])
+                  }
 
                   setAudioUrls((prev) => {
                     const newUrls = { ...prev }

@@ -69,6 +69,7 @@ export function DemoDashboard({ surveyId, title, questions, responses, createdAt
   }, [isExpired])
 
   const handleShare = () => {
+    // Generate the correct share URL for respondents
     const shareUrl = `${window.location.origin}/respond/demo/${surveyId}`
     navigator.clipboard.writeText(shareUrl)
     setShareTooltip(true)

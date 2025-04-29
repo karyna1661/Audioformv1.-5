@@ -67,16 +67,27 @@ export function DemoCreateForm() {
       return
     }
 
-    // In a real app, this would be an API call to create a demo survey
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Call our API to create the demo survey
+      const response = await fetch("/api/demo/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          questions: questions.map((q) => ({ id: q.id, text: q.text })),
+        }),
+      })
 
-      // Generate a random survey ID for the demo
-      const demoSurveyId = `demo_${Date.now()}`
+      if (!response.ok) {
+        throw new Error("Failed to create demo survey")
+      }
 
-      // Redirect to demo dashboard
-      router.push(`/demo/${demoSurveyId}`)
+      const { demoId } = await response.json()
+
+      // Redirect to demo dashboard with the demoId
+      router.push(`/demo?demoId=${demoId}`)
     } catch (error) {
       console.error("Error creating demo survey:", error)
       toast({
