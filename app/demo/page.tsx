@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/header"
 import { DemoDashboard } from "@/components/survey/demo-flow/demo-dashboard"
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabaseClient"
+import { getDemoSessionStatus } from "@/app/actions/demo-sessions"
 
 export default function DemoPage() {
   const params = useSearchParams()
@@ -13,6 +14,7 @@ export default function DemoPage() {
   const [surveyData, setSurveyData] = useState<any>(null)
   const [loading, setLoading] = useState(demoId ? true : false)
   const [error, setError] = useState<string | null>(null)
+  const [sessionStatus, setSessionStatus] = useState<any>(null)
 
   useEffect(() => {
     if (demoId) {
@@ -36,6 +38,10 @@ export default function DemoPage() {
         .eq("survey_id", id)
 
       if (responsesError) throw responsesError
+
+      // Fetch demo session status
+      const sessionData = await getDemoSessionStatus(id)
+      setSessionStatus(sessionData)
 
       // Format the data for the DemoDashboard component
       const formattedData = {
@@ -103,6 +109,7 @@ export default function DemoPage() {
             responses={surveyData.responses}
             createdAt={surveyData.createdAt}
             expiresAt={surveyData.expiresAt}
+            sessionStatus={sessionStatus}
           />
         ) : null}
       </main>

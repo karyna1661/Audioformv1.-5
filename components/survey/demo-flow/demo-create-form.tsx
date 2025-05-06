@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -10,6 +10,7 @@ import { Plus, Trash2, Save, Clock } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { useAnalytics } from "@/contexts/analytics-context"
 
 // Define the question type
 interface Question {
@@ -20,23 +21,36 @@ interface Question {
 export function DemoCreateForm() {
   const router = useRouter()
   const { toast } = useToast()
+  const { trackEvent } = useAnalytics()
   const [title, setTitle] = useState("")
+  const [email, setEmail] = useState("")
   const [questions, setQuestions] = useState<Question[]>([{ id: "1", text: "" }])
   const [isSaving, setIsSaving] = useState(false)
 
   // For demo, limit to 5 questions
   const maxQuestions = 5
 
+  // Track form view
+  useEffect(() => {
+    trackEvent("demo_form_viewed")
+  }, [trackEvent])
+
   const handleAddQuestion = () => {
     if (questions.length >= maxQuestions) return
 
     const newId = (questions.length + 1).toString()
     setQuestions([...questions, { id: newId, text: "" }])
+
+    // Track question added
+    trackEvent("demo_question_added", { question_count: questions.length + 1 })
   }
 
   const handleRemoveQuestion = (id: string) => {
     if (questions.length <= 1) return
     setQuestions(questions.filter((q) => q.id !== id))
+
+    // Track question removed
+    trackEvent("demo_question_removed", { question_count: questions.length - 1 })
   }
 
   const handleQuestionChange = (id: string, text: string) => {
@@ -68,6 +82,16 @@ export function DemoCreateForm() {
     }
 
     try {
+      // Track demo submission attempt
+      await trackEvent("demo_submission_started", {
+        title,
+        question_count: questions.length,
+        has_email: !!email,
+      })
+
+      // Get session ID from localStorage for tracking
+      const sessionId = localStorage.getItem("audioform_session_id")
+
       // Call our API to create the demo survey
       const response = await fetch("/api/demo/create", {
         method: "POST",
@@ -77,19 +101,38 @@ export function DemoCreateForm() {
         body: JSON.stringify({
           title,
           questions: questions.map((q) => ({ id: q.id, text: q.text })),
+          email: email || undefined, // Only send if provided
+          sessionId, // Pass session ID for analytics tracking
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error("Failed to create demo survey")
+        throw new Error(data.error || "Failed to create demo survey")
       }
 
-      const { demoId } = await response.json()
+      // Track successful demo creation
+      await trackEvent("demo_submission_completed", {
+        title,
+        question_count: questions.length,
+        has_email: !!email,
+        demo_id: data.demoId,
+      })
 
       // Redirect to demo dashboard with the demoId
-      router.push(`/demo?demoId=${demoId}`)
+      router.push(`/demo?demoId=${data.demoId}`)
     } catch (error) {
       console.error("Error creating demo survey:", error)
+
+      // Track error
+      await trackEvent("demo_submission_error", {
+        title,
+        question_count: questions.length,
+        has_email: !!email,
+        error: (error as Error).message,
+      })
+
       toast({
         title: "Error",
         description: "Failed to create demo survey. Please try again.",
@@ -122,6 +165,20 @@ export function DemoCreateForm() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Your Email (optional)</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email to save your demo"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Providing your email allows us to notify you before your demo expires.
+              </p>
             </div>
           </div>
         </CardContent>

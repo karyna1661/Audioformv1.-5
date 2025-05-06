@@ -4,10 +4,12 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlayPauseButton } from "@/components/audio/play-pause-button"
-import { Badge } from "@/components/ui/badge"
-import { Clock, Share2, AlertTriangle } from "lucide-react"
+import { Share2 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { DemoExpiryModal } from "./demo-expiry-modal"
+import { ExpirationStatus } from "./expiration-status"
+import { ExpirationNotification } from "./expiration-notification"
+import { useAnalytics } from "@/contexts/analytics-context"
 
 interface Response {
   id: string
@@ -22,6 +24,14 @@ interface Question {
   text: string
 }
 
+interface SessionStatus {
+  exists: boolean
+  isExpired?: boolean
+  isActive?: boolean
+  expiresAt?: string
+  notified?: boolean
+}
+
 interface DemoDashboardProps {
   surveyId: string
   title: string
@@ -29,44 +39,42 @@ interface DemoDashboardProps {
   responses: Response[]
   createdAt: string
   expiresAt: string
+  sessionStatus?: SessionStatus | null
 }
 
-export function DemoDashboard({ surveyId, title, questions, responses, createdAt, expiresAt }: DemoDashboardProps) {
+export function DemoDashboard({
+  surveyId,
+  title,
+  questions,
+  responses,
+  createdAt,
+  expiresAt,
+  sessionStatus,
+}: DemoDashboardProps) {
   const [isExpired, setIsExpired] = useState(false)
-  const [timeRemaining, setTimeRemaining] = useState("")
   const [showExpiryModal, setShowExpiryModal] = useState(false)
   const [shareTooltip, setShareTooltip] = useState(false)
+  const { trackEvent } = useAnalytics()
 
-  // Check if the survey is expired
+  // Track dashboard view
   useEffect(() => {
-    const checkExpiry = () => {
-      const now = new Date()
-      const expiry = new Date(expiresAt)
+    trackEvent("demo_viewed", { survey_id: surveyId, response_count: responses.length })
 
-      if (now >= expiry) {
-        setIsExpired(true)
-        setTimeRemaining("Expired")
-      } else {
-        setIsExpired(false)
-        setTimeRemaining(formatDistanceToNow(expiry, { addSuffix: false }))
-      }
+    // If this is the first response, track the event
+    if (responses.length === 1) {
+      trackEvent("responses_received", { survey_id: surveyId })
     }
+  }, [trackEvent, surveyId, responses.length])
 
-    // Initial check
-    checkExpiry()
-
-    // Set up interval to update time remaining
-    const interval = setInterval(checkExpiry, 60000) // Update every minute
-
-    return () => clearInterval(interval)
-  }, [expiresAt])
-
-  // Show expiry modal if expired
+  // Check if the survey is expired based on props or session status
   useEffect(() => {
-    if (isExpired) {
-      setShowExpiryModal(true)
+    const now = new Date()
+    const expiry = new Date(expiresAt)
+
+    if (sessionStatus?.isExpired || now >= expiry) {
+      setIsExpired(true)
     }
-  }, [isExpired])
+  }, [expiresAt, sessionStatus])
 
   const handleShare = () => {
     // Generate the correct share URL for respondents
@@ -74,6 +82,9 @@ export function DemoDashboard({ surveyId, title, questions, responses, createdAt
     navigator.clipboard.writeText(shareUrl)
     setShareTooltip(true)
     setTimeout(() => setShareTooltip(false), 2000)
+
+    // Track share event
+    trackEvent("demo_shared", { survey_id: surveyId, share_method: "clipboard" })
   }
 
   return (
@@ -84,10 +95,10 @@ export function DemoDashboard({ surveyId, title, questions, responses, createdAt
           <p className="text-muted-foreground">Demo Survey Dashboard</p>
         </div>
         <div className="mt-4 md:mt-0 flex items-center gap-4">
-          <Badge variant="outline" className={`flex items-center gap-1 ${isExpired ? "bg-red-50 text-red-800" : ""}`}>
-            <Clock className="h-3 w-3" />
-            {isExpired ? "Expired" : `${timeRemaining} remaining`}
-          </Badge>
+          <ExpirationStatus
+            expiresAt={sessionStatus?.expiresAt || expiresAt}
+            isExpired={sessionStatus?.isExpired || isExpired}
+          />
           <div className="relative">
             <Button onClick={handleShare} disabled={isExpired}>
               <Share2 className="mr-2 h-4 w-4" />
@@ -102,21 +113,12 @@ export function DemoDashboard({ surveyId, title, questions, responses, createdAt
         </div>
       </div>
 
-      {isExpired && (
-        <Card className="bg-red-50 border-red-200">
-          <CardContent className="p-4 flex items-center gap-4">
-            <AlertTriangle className="h-6 w-6 text-red-600" />
-            <div>
-              <p className="font-medium">This demo survey has expired</p>
-              <p className="text-sm text-muted-foreground">
-                Join our waitlist to keep access to your responses and create unlimited surveys.
-              </p>
-            </div>
-            <Button className="ml-auto" onClick={() => setShowExpiryModal(true)}>
-              Join Waitlist
-            </Button>
-          </CardContent>
-        </Card>
+      {sessionStatus && sessionStatus.exists && (
+        <ExpirationNotification
+          surveyId={surveyId}
+          expiresAt={sessionStatus.expiresAt || expiresAt}
+          notified={sessionStatus.notified || false}
+        />
       )}
 
       <div className="grid gap-6">
@@ -151,7 +153,18 @@ export function DemoDashboard({ surveyId, title, questions, responses, createdAt
                           </div>
                         </div>
                         <div className="flex items-center">
-                          <PlayPauseButton audioUrl={response.audioUrl} className="mr-4" disabled={isExpired} />
+                          <PlayPauseButton
+                            audioUrl={response.audioUrl}
+                            className="mr-4"
+                            disabled={isExpired}
+                            onPlay={() =>
+                              trackEvent("audio_played", {
+                                survey_id: surveyId,
+                                question_id: question.id,
+                                response_id: response.id,
+                              })
+                            }
+                          />
                           <div className="flex-1">
                             <div className="h-2 bg-slate-100 rounded-full">
                               <div className="h-2 bg-blue-500 rounded-full" style={{ width: "0%" }} />

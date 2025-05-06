@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { CheckCircle } from "lucide-react"
+import { useAnalytics } from "@/contexts/analytics-context"
 
 interface DemoExpiryModalProps {
   isOpen: boolean
@@ -22,10 +23,18 @@ interface DemoExpiryModalProps {
 
 export function DemoExpiryModal({ isOpen, onClose }: DemoExpiryModalProps) {
   const { toast } = useToast()
+  const { trackEvent } = useAnalytics()
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [error, setError] = useState("")
+
+  // Track modal open
+  useState(() => {
+    if (isOpen) {
+      trackEvent("waitlist_modal_opened")
+    }
+  })
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -53,6 +62,9 @@ export function DemoExpiryModal({ isOpen, onClose }: DemoExpiryModalProps) {
       // In a real app, this would be an API call to add to waitlist
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
+      // Track waitlist signup
+      await trackEvent("waitlist_joined", { email })
+
       // Show success state
       setIsSubmitted(true)
 
@@ -64,6 +76,9 @@ export function DemoExpiryModal({ isOpen, onClose }: DemoExpiryModalProps) {
     } catch (err) {
       console.error("Error joining waitlist:", err)
       setError("Failed to join waitlist. Please try again.")
+
+      // Track error
+      await trackEvent("waitlist_error", { email, error: (err as Error).message })
     } finally {
       setIsSubmitting(false)
     }
@@ -96,7 +111,14 @@ export function DemoExpiryModal({ isOpen, onClose }: DemoExpiryModalProps) {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  trackEvent("waitlist_dismissed")
+                  onClose()
+                }}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
               <Button onClick={handleSubmit} disabled={isSubmitting}>
