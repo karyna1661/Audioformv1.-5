@@ -11,7 +11,7 @@ import { useMobile } from "@/hooks/use-mobile"
 import { ArrowLeft, ArrowRight, CheckCircle, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
-import { supabase } from "@/lib/supabaseClient"
+import { supabaseBrowser } from "@/lib/supabaseClient"
 
 interface SurveyQuestion {
   id: string
@@ -51,7 +51,7 @@ export default function RespondDemoPage({ params }: { params: { id: string } }) 
         setLoading(true)
 
         // Get survey from Supabase
-        const { data: surveyData, error: surveyError } = await supabase
+        const { data: surveyData, error: surveyError } = await supabaseBrowser
           .from("surveys")
           .select("*")
           .eq("id", surveyId)
@@ -173,7 +173,7 @@ export default function RespondDemoPage({ params }: { params: { id: string } }) 
       for (const question of survey.questions) {
         if (responses[question.id]) {
           // Find the response in Supabase by survey_id and question_id
-          const { data: responseData } = await supabase
+          const { data: responseData } = await supabaseBrowser
             .from("responses")
             .select("id")
             .eq("survey_id", surveyId)
@@ -184,7 +184,7 @@ export default function RespondDemoPage({ params }: { params: { id: string } }) 
 
           if (responseData) {
             // Update the email
-            await supabase.from("responses").update({ email }).eq("id", responseData.id)
+            await supabaseBrowser.from("responses").update({ email }).eq("id", responseData.id)
           }
         }
       }

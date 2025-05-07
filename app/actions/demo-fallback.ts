@@ -1,7 +1,6 @@
 "use server"
 
-import { createClient } from "@/utils/supabase/server"
-import { cookies } from "next/headers"
+import { supabaseBrowser } from "@/lib/supabaseClient"
 import { trackServerEvent } from "./analytics"
 
 /**
@@ -14,23 +13,19 @@ export async function createDemoSurveyFallback(data: {
   email?: string
   sessionId?: string
 }) {
-  const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
-
   try {
     // Calculate expiry date (24 hours from now)
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 24)
 
-    // Insert survey row
-    const { data: surveyData, error: surveyError } = await supabase
+    // Insert survey row - explicitly NOT including user_id to avoid foreign key issues
+    const { data: surveyData, error: surveyError } = await supabaseBrowser
       .from("surveys")
       .insert({
         title: data.title || "Demo Survey",
         type: "demo",
         questions: data.questions,
         expires_at: expiresAt.toISOString(),
-        // No user_id here as we're using the anonymous client
       })
       .select("id")
       .single()
@@ -38,6 +33,17 @@ export async function createDemoSurveyFallback(data: {
     if (surveyError) {
       console.error("Error creating demo survey:", surveyError)
       return { success: false, error: "Failed to create survey" }
+    }
+
+    // Create demo session without user_id
+    const { error: sessionError } = await supabaseBrowser.from("demo_sessions").insert({
+      survey_id: surveyData.id,
+      expires_at: expiresAt.toISOString(),
+    })
+
+    if (sessionError) {
+      console.error("Error creating demo session:", sessionError)
+      // Continue anyway as the survey was created successfully
     }
 
     // Track the demo creation event

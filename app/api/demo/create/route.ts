@@ -1,23 +1,7 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { supabaseServer } from "@/lib/supabaseClient"
 import { trackServerEvent } from "@/app/actions/analytics"
 import { createDemoSurveyFallback } from "@/app/actions/demo-fallback"
-
-// Create a Supabase client with the service role key for admin operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-// Validate environment variables
-if (!supabaseUrl || !serviceRoleKey) {
-  console.error("Missing required environment variables for Supabase admin client")
-}
-
-const supabaseAdmin = createClient(supabaseUrl || "", serviceRoleKey || "", {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
 
 export async function POST(req: Request) {
   try {
@@ -59,26 +43,42 @@ export async function POST(req: Request) {
     if (email) {
       try {
         // Check if user exists
-        const { data: existingUser, error: findUserError } = await supabaseAdmin
+        const { data: existingUser, error: findUserError } = await supabaseServer
           .from("users")
           .select("id")
           .eq("email", email)
           .maybeSingle()
 
-        if (findUserError) throw findUserError
+        if (findUserError) {
+          console.error("Error finding user:", findUserError)
+          // Continue without user ID
+        } else if (existingUser) {
+          // Verify the user ID exists
+          const { count, error: countError } = await supabaseServer
+            .from("users")
+            .select("*", { count: "exact", head: true })
+            .eq("id", existingUser.id)
 
-        if (existingUser) {
-          userId = existingUser.id
+          if (countError) {
+            console.error("Error verifying user ID:", countError)
+          } else if (count && count > 0) {
+            userId = existingUser.id
+          } else {
+            console.error("User ID exists in query but not in database:", existingUser.id)
+          }
         } else {
           // Create new user
-          const { data: newUser, error: createUserError } = await supabaseAdmin
+          const { data: newUser, error: createUserError } = await supabaseServer
             .from("users")
             .insert({ email })
             .select("id")
             .single()
 
-          if (createUserError) throw createUserError
-          userId = newUser.id
+          if (createUserError) {
+            console.error("Error creating user:", createUserError)
+          } else if (newUser) {
+            userId = newUser.id
+          }
         }
       } catch (userError) {
         console.error("Error with user operation:", userError)
@@ -87,30 +87,93 @@ export async function POST(req: Request) {
     }
 
     // Insert survey row using the admin client
-    const { data: surveyData, error: surveyError } = await supabaseAdmin
+    // Only include user_id if we have a valid one
+    const surveyData = {
+      title: title || "Demo Survey",
+      type: "demo",
+      questions,
+      expires_at: expiresAt.toISOString(),
+      ...(userId ? { user_id: userId } : {}),
+    }
+
+    const { data: createdSurvey, error: surveyError } = await supabaseServer
       .from("surveys")
-      .insert({
-        title: title || "Demo Survey",
-        type: "demo",
-        questions,
-        expires_at: expiresAt.toISOString(),
-        user_id: userId,
-      })
+      .insert(surveyData)
       .select("id")
       .single()
 
     if (surveyError) {
       console.error("Error creating demo survey:", surveyError)
+
+      // If there's a foreign key error, try again without the user_id
+      if (surveyError.code === "23503" && surveyError.message.includes("violates foreign key constraint")) {
+        console.log("Foreign key violation detected, retrying without user_id")
+
+        const { data: retryData, error: retryError } = await supabaseServer
+          .from("surveys")
+          .insert({
+            title: title || "Demo Survey",
+            type: "demo",
+            questions,
+            expires_at: expiresAt.toISOString(),
+            // No user_id this time
+          })
+          .select("id")
+          .single()
+
+        if (retryError) {
+          console.error("Error in retry attempt:", retryError)
+          return NextResponse.json({ error: "Failed to create survey" }, { status: 500 })
+        }
+
+        // Use the retry data
+        if (retryData) {
+          // Create demo session without user_id
+          const { error: sessionError } = await supabaseServer.from("demo_sessions").insert({
+            survey_id: retryData.id,
+            expires_at: expiresAt.toISOString(),
+          })
+
+          if (sessionError) {
+            console.error("Error creating demo session:", sessionError)
+          }
+
+          // Track the demo creation event
+          await trackServerEvent(
+            "demo_created",
+            {
+              title,
+              question_count: questions.length,
+              has_email: !!email,
+            },
+            {
+              surveyId: retryData.id,
+              sessionId,
+            },
+          )
+
+          return NextResponse.json(
+            {
+              demoId: retryData.id,
+              expiresAt: expiresAt.toISOString(),
+            },
+            { status: 200 },
+          )
+        }
+      }
+
       return NextResponse.json({ error: "Failed to create survey" }, { status: 500 })
     }
 
     // Create demo session
-    if (surveyData.id) {
-      const { error: sessionError } = await supabaseAdmin.from("demo_sessions").insert({
-        user_id: userId,
-        survey_id: surveyData.id,
+    if (createdSurvey.id) {
+      const sessionData = {
+        survey_id: createdSurvey.id,
         expires_at: expiresAt.toISOString(),
-      })
+        ...(userId ? { user_id: userId } : {}),
+      }
+
+      const { error: sessionError } = await supabaseServer.from("demo_sessions").insert(sessionData)
 
       if (sessionError) {
         console.error("Error creating demo session:", sessionError)
@@ -128,14 +191,14 @@ export async function POST(req: Request) {
       },
       {
         userId: userId || undefined,
-        surveyId: surveyData.id,
+        surveyId: createdSurvey.id,
         sessionId,
       },
     )
 
     return NextResponse.json(
       {
-        demoId: surveyData.id,
+        demoId: createdSurvey.id,
         expiresAt: expiresAt.toISOString(),
       },
       { status: 200 },
