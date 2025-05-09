@@ -93,7 +93,7 @@ export function DemoCreateForm() {
       const sessionId = localStorage.getItem("audioform_session_id")
 
       // Call our API to create the demo survey
-      const response = await fetch("/api/demo/create", {
+      const response = await fetch("/api/demo-create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

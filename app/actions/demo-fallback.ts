@@ -1,72 +1,46 @@
 "use server"
 
 import { supabaseBrowser } from "@/lib/supabaseClient"
-import { trackServerEvent } from "./analytics"
 
-/**
- * Fallback method to create a demo survey without requiring the service role key
- * This uses the authenticated client with RLS policies instead
- */
-export async function createDemoSurveyFallback(data: {
+type CreateDemoSurveyParams = {
   title: string
-  questions: Array<{ id: string; text: string }>
-  email?: string
-  sessionId?: string
-}) {
-  try {
-    // Calculate expiry date (24 hours from now)
-    const expiresAt = new Date()
-    expiresAt.setHours(expiresAt.getHours() + 24)
+  questions: any[]
+  expiresAt: string
+}
 
-    // Insert survey row - explicitly NOT including user_id to avoid foreign key issues
-    const { data: surveyData, error: surveyError } = await supabaseBrowser
+type CreateDemoSurveyResult = {
+  demoId?: string
+  expiresAt?: string
+  error?: string
+}
+
+export async function createDemoSurveyFallback(params: CreateDemoSurveyParams): Promise<CreateDemoSurveyResult> {
+  try {
+    const { title, questions, expiresAt } = params
+
+    // Use the browser client which will use RLS policies
+    const { data, error } = await supabaseBrowser
       .from("surveys")
       .insert({
-        title: data.title || "Demo Survey",
+        title,
+        questions,
         type: "demo",
-        questions: data.questions,
-        expires_at: expiresAt.toISOString(),
+        expires_at: expiresAt,
       })
       .select("id")
       .single()
 
-    if (surveyError) {
-      console.error("Error creating demo survey:", surveyError)
-      return { success: false, error: "Failed to create survey" }
+    if (error) {
+      console.error("Error in fallback demo creation:", error)
+      return { error: `Failed to create demo survey: ${error.message}` }
     }
-
-    // Create demo session without user_id
-    const { error: sessionError } = await supabaseBrowser.from("demo_sessions").insert({
-      survey_id: surveyData.id,
-      expires_at: expiresAt.toISOString(),
-    })
-
-    if (sessionError) {
-      console.error("Error creating demo session:", sessionError)
-      // Continue anyway as the survey was created successfully
-    }
-
-    // Track the demo creation event
-    await trackServerEvent(
-      "demo_created",
-      {
-        title: data.title,
-        question_count: data.questions.length,
-        has_email: !!data.email,
-      },
-      {
-        surveyId: surveyData.id,
-        sessionId: data.sessionId,
-      },
-    )
 
     return {
-      success: true,
-      demoId: surveyData.id,
-      expiresAt: expiresAt.toISOString(),
+      demoId: data.id,
+      expiresAt,
     }
   } catch (error) {
-    console.error("Error in fallback demo creation:", error)
-    return { success: false, error: "Failed to create survey" }
+    console.error("Exception in fallback demo creation:", error)
+    return { error: "An unexpected error occurred" }
   }
 }
