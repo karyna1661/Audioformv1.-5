@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         const result = await supabaseServer.from("demo_sessions").insert({
           survey_id: survey.id,
           expires_at: expiresAt.toISOString(),
-          email: email || null,
+          // Remove the email field from here
         })
 
         sessionError = result.error
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
           const result = await supabaseBrowser.from("demo_sessions").insert({
             survey_id: survey.id,
             expires_at: expiresAt.toISOString(),
-            email: email || null,
+            // Remove the email field from here
           })
 
           if (result.error) {

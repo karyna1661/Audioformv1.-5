@@ -85,6 +85,8 @@ export interface Database {
           survey_id: string
           created_at: string
           expires_at: string
+          email: string | null
+          notified: boolean | null
         }
         Insert: {
           id?: string
@@ -92,6 +94,8 @@ export interface Database {
           survey_id: string
           created_at?: string
           expires_at: string
+          email?: string | null
+          notified?: boolean | null
         }
         Update: {
           id?: string
@@ -99,6 +103,8 @@ export interface Database {
           survey_id?: string
           created_at?: string
           expires_at?: string
+          email?: string | null
+          notified?: boolean | null
         }
       }
       analytics_events: {
