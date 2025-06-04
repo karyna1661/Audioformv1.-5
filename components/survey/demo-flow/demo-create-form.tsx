@@ -49,33 +49,32 @@ export function DemoCreateForm() {
     setError(null)
     setIsSaving(true)
 
-    // Validate form
-    if (!title.trim()) {
-      setError("Please enter a survey title")
-      setIsSaving(false)
-      return
-    }
-
-    const validQuestions = questions.filter((q) => q.text.trim())
-    if (validQuestions.length === 0) {
-      setError("Please add at least one question")
-      setIsSaving(false)
-      return
-    }
-
     try {
-      console.log("Submitting survey:", { title, questions: validQuestions, email })
+      // Validate form client-side
+      if (!title.trim()) {
+        throw new Error("Please enter a survey title")
+      }
 
-      const response = await fetch("/api/demo-create", {
+      const validQuestions = questions.filter((q) => q.text.trim())
+      if (validQuestions.length === 0) {
+        throw new Error("Please add at least one question")
+      }
+
+      // Prepare the payload - send questions as simple strings
+      const payload = {
+        title: title.trim(),
+        questions: validQuestions.map((q) => q.text.trim()),
+        email: email.trim() || undefined,
+      }
+
+      console.log("Sending payload:", payload)
+
+      const response = await fetch("/api/demo/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title: title.trim(),
-          questions: validQuestions.map((q) => ({ id: q.id, text: q.text.trim() })),
-          email: email.trim() || undefined,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
@@ -96,7 +95,7 @@ export function DemoCreateForm() {
       console.error("Error creating demo survey:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to create survey"
       setError(errorMessage)
-      toast.error("Failed to create survey. Please try again.")
+      toast.error(errorMessage)
     } finally {
       setIsSaving(false)
     }
@@ -129,7 +128,7 @@ export function DemoCreateForm() {
               placeholder="Enter survey title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-base" // Better for mobile
+              className="text-base"
             />
           </div>
 
@@ -141,7 +140,7 @@ export function DemoCreateForm() {
               placeholder="Enter your email to save your demo"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="text-base" // Better for mobile
+              className="text-base"
             />
             <p className="text-xs text-muted-foreground">
               Providing your email allows us to notify you before your demo expires.
@@ -177,7 +176,7 @@ export function DemoCreateForm() {
                   placeholder="Enter your question"
                   value={question.text}
                   onChange={(e) => handleQuestionChange(question.id, e.target.value)}
-                  className="text-base min-h-[80px]" // Better for mobile
+                  className="text-base min-h-[80px]"
                 />
               </div>
             ))}
@@ -186,7 +185,7 @@ export function DemoCreateForm() {
               variant="outline"
               onClick={handleAddQuestion}
               disabled={questions.length >= maxQuestions}
-              className="w-full h-12" // Larger touch target
+              className="w-full h-12"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Question ({questions.length}/{maxQuestions})
