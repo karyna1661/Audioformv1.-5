@@ -1,171 +1,72 @@
 import { NextResponse } from "next/server"
-import { getSupabaseServer, supabaseBrowser } from "@/lib/supabaseClient"
-import { trackServerEvent } from "@/app/actions/analytics"
-import { createDemoSurveyFallback } from "@/app/actions/demo-fallback"
+import { supabase } from "@/lib/supabase/client"
 
 export async function POST(req: Request) {
   try {
-    const { title, questions, email, sessionId } = await req.json()
+    const { title, questions, email } = await req.json()
+
+    console.log("Demo creation request:", { title, questionCount: questions?.length, hasEmail: !!email })
+
+    // Validate input
+    if (!title || !questions || questions.length === 0) {
+      return NextResponse.json({ error: "Title and questions are required" }, { status: 400 })
+    }
 
     // Calculate expiry date (24 hours from now)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    const expiresAtISO = expiresAt.toISOString()
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
-    console.log("Demo creation request received:", {
-      title,
-      questionCount: questions?.length || 0,
-      hasEmail: !!email,
-    })
+    // Create the survey using the client (which uses anon key with RLS)
+    const { data: surveyData, error: surveyError } = await supabase
+      .from("surveys")
+      .insert({
+        title: title.trim(),
+        questions: questions,
+        type: "demo",
+        expires_at: expiresAt,
+        user_id: null, // Demo surveys don't have a user
+      })
+      .select("id")
+      .single()
 
-    // Try multiple approaches to create the survey
-    let demoId: string | undefined
-    let error: any
+    if (surveyError) {
+      console.error("Survey creation error:", surveyError)
+      return NextResponse.json({ error: `Failed to create survey: ${surveyError.message}` }, { status: 500 })
+    }
 
-    // Approach 1: Try with service role key
+    if (!surveyData?.id) {
+      console.error("No survey data returned")
+      return NextResponse.json({ error: "Failed to create survey - no ID returned" }, { status: 500 })
+    }
+
+    console.log("Survey created successfully:", surveyData.id)
+
+    // Create demo session (optional - don't fail if this fails)
     try {
-      const supabaseServer = getSupabaseServer()
-      const { data, error: surveyError } = await supabaseServer
-        .from("surveys")
-        .insert({
-          title: title || "Demo Survey",
-          questions,
-          type: "demo",
-          expires_at: expiresAtISO,
-          // Explicitly set user_id to null for demo surveys
-          user_id: null,
-        })
-        .select("id")
-        .single()
+      const { error: sessionError } = await supabase.from("demo_sessions").insert({
+        survey_id: surveyData.id,
+        expires_at: expiresAt,
+        email: email || null,
+      })
 
-      if (surveyError) {
-        console.error("Error with service role insertion:", surveyError)
-        error = surveyError
-      } else if (data) {
-        demoId = data.id
-        console.log("Demo survey created with service role:", demoId)
-
-        // Create demo session
-        try {
-          await supabaseServer.from("demo_sessions").insert({
-            survey_id: demoId,
-            expires_at: expiresAtISO,
-            email: email || null,
-          })
-        } catch (sessionError) {
-          console.warn("Error creating demo session with service role:", sessionError)
-          // Not fatal, continue
-        }
+      if (sessionError) {
+        console.warn("Demo session creation failed:", sessionError)
+        // Don't fail the whole request for this
       }
-    } catch (serviceRoleError) {
-      console.error("Exception with service role insertion:", serviceRoleError)
-      error = serviceRoleError
+    } catch (sessionErr) {
+      console.warn("Demo session creation exception:", sessionErr)
+      // Don't fail the whole request for this
     }
 
-    // Approach 2: If service role failed, try the fallback method
-    if (!demoId) {
-      console.log("Service role approach failed, trying fallback method")
-
-      try {
-        const fallbackResult = await createDemoSurveyFallback({
-          title: title || "Demo Survey",
-          questions,
-          expiresAt: expiresAtISO,
-          email,
-        })
-
-        if (fallbackResult.error) {
-          console.error("Fallback method also failed:", fallbackResult.error)
-          error = new Error(fallbackResult.error)
-        } else if (fallbackResult.demoId) {
-          demoId = fallbackResult.demoId
-          console.log("Demo survey created with fallback method:", demoId)
-        }
-      } catch (fallbackError) {
-        console.error("Exception in fallback method:", fallbackError)
-        error = fallbackError
-      }
-    }
-
-    // Approach 3: Direct browser client attempt as last resort
-    if (!demoId) {
-      console.log("Both approaches failed, trying direct browser client")
-
-      try {
-        const { data, error: directError } = await supabaseBrowser
-          .from("surveys")
-          .insert({
-            title: title || "Demo Survey",
-            questions,
-            type: "demo",
-            expires_at: expiresAtISO,
-            // Explicitly set user_id to null for demo surveys
-            user_id: null,
-          })
-          .select("id")
-          .single()
-
-        if (directError) {
-          console.error("Direct browser client insertion failed:", directError)
-          error = directError
-        } else if (data) {
-          demoId = data.id
-          console.log("Demo survey created with direct browser client:", demoId)
-
-          // Create demo session
-          try {
-            await supabaseBrowser.from("demo_sessions").insert({
-              survey_id: demoId,
-              expires_at: expiresAtISO,
-              email: email || null,
-            })
-          } catch (sessionError) {
-            console.warn("Error creating demo session with browser client:", sessionError)
-            // Not fatal, continue
-          }
-        }
-      } catch (directError) {
-        console.error("Exception with direct browser client:", directError)
-        error = directError
-      }
-    }
-
-    // If we have a demoId, track analytics and return success
-    if (demoId) {
-      // Track the demo creation event
-      if (typeof trackServerEvent === "function") {
-        try {
-          await trackServerEvent(
-            "demo_created",
-            {
-              title,
-              question_count: questions?.length || 0,
-              has_email: !!email,
-            },
-            {
-              surveyId: demoId,
-              sessionId,
-            },
-          )
-        } catch (analyticsError) {
-          console.error("Error tracking demo creation:", analyticsError)
-          // Non-fatal, continue
-        }
-      }
-
-      return NextResponse.json(
-        {
-          demoId,
-          expiresAt: expiresAtISO,
-        },
-        { status: 201 },
-      )
-    }
-
-    // If we get here, all approaches failed
-    console.error("All demo creation approaches failed")
-    return NextResponse.json({ error: "Failed to create survey after multiple attempts" }, { status: 500 })
+    return NextResponse.json(
+      {
+        demoId: surveyData.id,
+        expiresAt,
+        message: "Survey created successfully",
+      },
+      { status: 201 },
+    )
   } catch (error) {
-    console.error("Unhandled error in demo-create API route:", error)
-    return NextResponse.json({ error: "Failed to process request" }, { status: 500 })
+    console.error("Unhandled error in demo-create:", error)
+    return NextResponse.json({ error: "An unexpected error occurred. Please try again." }, { status: 500 })
   }
 }

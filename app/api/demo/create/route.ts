@@ -1,34 +1,25 @@
 import { NextResponse } from "next/server"
-import { supabaseServer } from "@/lib/supabaseClient"
-import { trackServerEvent } from "@/app/actions/analytics"
-import { createDemoSurveyFallback } from "@/app/actions/demo-fallback"
+import { supabaseServer } from "@/lib/supabase/server"
 
 export async function POST(req: Request) {
   try {
-    const { title, questions, email, sessionId } = await req.json()
+    const body = await req.json()
+    const { title, questions, email, sessionId } = body
 
-    // Verify that the service role key is available
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable")
+    // Validate required fields
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return NextResponse.json({ error: "Questions array is required and must not be empty" }, { status: 400 })
+    }
 
-      // Use fallback method if service role key is missing
-      const fallbackResult = await createDemoSurveyFallback({
-        title,
-        questions,
-        email,
-        sessionId,
-      })
+    if (!title || typeof title !== "string") {
+      return NextResponse.json({ error: "Title is required and must be a string" }, { status: 400 })
+    }
 
-      if (fallbackResult.success) {
-        return NextResponse.json(
-          {
-            demoId: fallbackResult.demoId,
-            expiresAt: fallbackResult.expiresAt,
-          },
-          { status: 200 },
-        )
-      } else {
-        return NextResponse.json({ error: fallbackResult.error }, { status: 500 })
+    // Validate questions format
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i]
+      if (!question || typeof question !== "string" || question.trim().length === 0) {
+        return NextResponse.json({ error: `Question ${i + 1} is invalid or empty` }, { status: 400 })
       }
     }
 
@@ -36,47 +27,29 @@ export async function POST(req: Request) {
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 24)
 
-    // Create survey without requiring user creation first
     let userId = null
 
     // Only attempt to create/find user if email is provided
-    if (email) {
+    if (email && typeof email === "string" && email.trim().length > 0) {
       try {
         // Check if user exists
         const { data: existingUser, error: findUserError } = await supabaseServer
           .from("users")
           .select("id")
-          .eq("email", email)
+          .eq("email", email.trim())
           .maybeSingle()
 
-        if (findUserError) {
-          console.error("Error finding user:", findUserError)
-          // Continue without user ID
-        } else if (existingUser) {
-          // Verify the user ID exists
-          const { count, error: countError } = await supabaseServer
-            .from("users")
-            .select("*", { count: "exact", head: true })
-            .eq("id", existingUser.id)
-
-          if (countError) {
-            console.error("Error verifying user ID:", countError)
-          } else if (count && count > 0) {
-            userId = existingUser.id
-          } else {
-            console.error("User ID exists in query but not in database:", existingUser.id)
-          }
+        if (!findUserError && existingUser) {
+          userId = existingUser.id
         } else {
           // Create new user
           const { data: newUser, error: createUserError } = await supabaseServer
             .from("users")
-            .insert({ email })
+            .insert({ email: email.trim() })
             .select("id")
             .single()
 
-          if (createUserError) {
-            console.error("Error creating user:", createUserError)
-          } else if (newUser) {
+          if (!createUserError && newUser) {
             userId = newUser.id
           }
         }
@@ -86,16 +59,16 @@ export async function POST(req: Request) {
       }
     }
 
-    // Insert survey row using the admin client
-    // Only include user_id if we have a valid one
+    // Prepare survey data
     const surveyData = {
-      title: title || "Demo Survey",
-      type: "demo",
-      questions,
+      title: title.trim(),
+      type: "demo" as const,
+      questions: questions.map((q) => q.trim()),
       expires_at: expiresAt.toISOString(),
       ...(userId ? { user_id: userId } : {}),
     }
 
+    // Insert survey
     const { data: createdSurvey, error: surveyError } = await supabaseServer
       .from("surveys")
       .insert(surveyData)
@@ -106,17 +79,14 @@ export async function POST(req: Request) {
       console.error("Error creating demo survey:", surveyError)
 
       // If there's a foreign key error, try again without the user_id
-      if (surveyError.code === "23503" && surveyError.message.includes("violates foreign key constraint")) {
-        console.log("Foreign key violation detected, retrying without user_id")
-
+      if (surveyError.code === "23503") {
         const { data: retryData, error: retryError } = await supabaseServer
           .from("surveys")
           .insert({
-            title: title || "Demo Survey",
-            type: "demo",
-            questions,
+            title: title.trim(),
+            type: "demo" as const,
+            questions: questions.map((q) => q.trim()),
             expires_at: expiresAt.toISOString(),
-            // No user_id this time
           })
           .select("id")
           .single()
@@ -126,7 +96,6 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Failed to create survey" }, { status: 500 })
         }
 
-        // Use the retry data
         if (retryData) {
           // Create demo session without user_id
           const { error: sessionError } = await supabaseServer.from("demo_sessions").insert({
@@ -137,20 +106,6 @@ export async function POST(req: Request) {
           if (sessionError) {
             console.error("Error creating demo session:", sessionError)
           }
-
-          // Track the demo creation event
-          await trackServerEvent(
-            "demo_created",
-            {
-              title,
-              question_count: questions.length,
-              has_email: !!email,
-            },
-            {
-              surveyId: retryData.id,
-              sessionId,
-            },
-          )
 
           return NextResponse.json(
             {
@@ -166,7 +121,7 @@ export async function POST(req: Request) {
     }
 
     // Create demo session
-    if (createdSurvey.id) {
+    if (createdSurvey?.id) {
       const sessionData = {
         survey_id: createdSurvey.id,
         expires_at: expiresAt.toISOString(),
@@ -181,21 +136,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Track the demo creation event
-    await trackServerEvent(
-      "demo_created",
-      {
-        title,
-        question_count: questions.length,
-        has_email: !!email,
-      },
-      {
-        userId: userId || undefined,
-        surveyId: createdSurvey.id,
-        sessionId,
-      },
-    )
-
     return NextResponse.json(
       {
         demoId: createdSurvey.id,
@@ -205,6 +145,6 @@ export async function POST(req: Request) {
     )
   } catch (error) {
     console.error("Error creating demo survey:", error)
-    return NextResponse.json({ error: "Failed to create survey" }, { status: 500 })
+    return NextResponse.json({ error: "Invalid request data or server error" }, { status: 500 })
   }
 }

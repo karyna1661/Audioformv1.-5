@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Mic, Users, Share, Zap, ArrowRight, Play } from "lucide-react"
+import { Mic, Users, Share, Zap, ArrowRight, Play, BarChart, Clock } from "lucide-react"
 import Link from "next/link"
 import Head from "next/head"
 
@@ -109,7 +109,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Features Section */}
+        {/* Features Section - Fixed Desktop Grid */}
         <section className="px-4 py-16 sm:py-20 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-12 sm:mb-16">
@@ -121,74 +121,77 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-6 sm:p-8 text-center">
+            {/* Fixed Grid Layout - 6 boxes in 2 rows of 3 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
+              {/* First Row */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
+                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
                     <Mic className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
                   </div>
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Authentic Responses</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
                     Capture genuine emotions and spontaneous thoughts that written surveys miss.
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-6 sm:p-8 text-center">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
+                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
                     <Zap className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
                   </div>
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Lightning Fast</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
                     Create and share surveys in under 60 seconds. No complex setup required.
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-1">
-                <CardContent className="p-6 sm:p-8 text-center">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
+                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
                     <Share className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
                   </div>
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Easy Sharing</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
                     Share via link, QR code, or social media. Works on any device with a microphone.
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-6 sm:p-8 text-center">
+              {/* Second Row */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
+                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
                     <Users className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
                   </div>
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Higher Engagement</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
                     Voice surveys get 3x more responses than traditional text-based forms.
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-6 sm:p-8 text-center">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
+                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                    <Zap className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
+                    <BarChart className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
                   </div>
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Real-time Insights</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
                     Get immediate feedback and analyze responses as they come in.
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-6 sm:p-8 text-center">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
+                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                    <Mic className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-600" />
+                    <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-600" />
                   </div>
                   <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Mobile Optimized</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
                     Perfect for mobile users. Record and submit responses in seconds.
                   </p>
                 </CardContent>
@@ -207,17 +210,19 @@ export default function HomePage() {
               <p className="text-lg sm:text-xl mb-6 sm:mb-8 opacity-90 px-2">
                 Start collecting authentic voice responses today. No signup required for the 24-hour demo.
               </p>
-              <Link href="/demo">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg font-semibold"
-                >
-                  <Mic className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                  Try Audioform Free
-                  <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
-                </Button>
-              </Link>
+              <div className="flex justify-center">
+                <Link href="/demo">
+                  <Button
+                    size="lg"
+                    variant="secondary"
+                    className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg font-semibold"
+                  >
+                    <Mic className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                    Try Audioform Free
+                    <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </section>
