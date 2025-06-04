@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Copy, Share } from "lucide-react"
+import { CheckCircle, Copy, Share2, X } from "lucide-react"
 import { toast } from "sonner"
 
 interface ThankYouModalProps {
@@ -11,79 +11,106 @@ interface ThankYouModalProps {
   onClose: () => void
   surveyTitle?: string
   shareUrl?: string
+  autoCloseDelay?: number
 }
 
-export function ThankYouModal({ isOpen, onClose, surveyTitle, shareUrl }: ThankYouModalProps) {
-  const [autoCloseTimer, setAutoCloseTimer] = useState(8)
+export function ThankYouModal({
+  isOpen,
+  onClose,
+  surveyTitle = "Survey",
+  shareUrl,
+  autoCloseDelay = 8000,
+}: ThankYouModalProps) {
+  const [timeLeft, setTimeLeft] = useState(autoCloseDelay / 1000)
 
   useEffect(() => {
-    if (isOpen && autoCloseTimer > 0) {
-      const timer = setTimeout(() => {
-        setAutoCloseTimer((prev) => prev - 1)
-      }, 1000)
-      return () => clearTimeout(timer)
-    } else if (autoCloseTimer === 0) {
-      onClose()
-    }
-  }, [isOpen, autoCloseTimer, onClose])
+    if (!isOpen) return
+
+    setTimeLeft(autoCloseDelay / 1000)
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          onClose()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isOpen, autoCloseDelay, onClose])
 
   const handleCopyLink = async () => {
-    if (shareUrl) {
-      try {
-        await navigator.clipboard.writeText(shareUrl)
-        toast.success("Link copied to clipboard!")
-      } catch (err) {
-        toast.error("Failed to copy link")
-      }
+    if (!shareUrl) return
+
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast.success("Link copied to clipboard!")
+    } catch (error) {
+      toast.error("Failed to copy link")
     }
   }
 
   const handleShareOnFarcaster = () => {
-    if (shareUrl && surveyTitle) {
-      const text = encodeURIComponent(`Just shared my thoughts on: "${surveyTitle}" 🎙️\n\nVoice your opinion too:`)
-      const url = encodeURIComponent(shareUrl)
-      window.open(`https://warpcast.com/~/compose?text=${text}&embeds[]=${url}`, "_blank")
-    }
+    if (!shareUrl) return
+
+    const text = encodeURIComponent(`Just shared my thoughts on "${surveyTitle}" - voice your opinion too!`)
+    const url = encodeURIComponent(shareUrl)
+    const farcasterUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${url}`
+
+    window.open(farcasterUrl, "_blank", "noopener,noreferrer")
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-            <CheckCircle className="h-8 w-8 text-green-600" />
+      <DialogContent className="sm:max-w-md mx-4 rounded-lg">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Thank You!
+            </DialogTitle>
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          <DialogTitle className="text-xl font-semibold">Thank You!</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 text-center">
-          <p className="text-muted-foreground">
-            Your voice response has been submitted successfully.
-            {surveyTitle && ` Thank you for sharing your thoughts on "${surveyTitle}".`}
-          </p>
+        <div className="space-y-4 p-2">
+          <div className="text-center">
+            <p className="text-muted-foreground text-sm sm:text-base">
+              Your voice response has been submitted successfully!
+            </p>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-2">Auto-closing in {timeLeft}s</p>
+          </div>
 
           {shareUrl && (
-            <div className="space-y-3 border-t pt-4">
-              <p className="text-sm font-medium">Share this survey with others:</p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleCopyLink} className="flex-1">
-                  <Copy className="mr-2 h-4 w-4" />
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Share this survey:</p>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" onClick={handleCopyLink} className="flex-1 text-xs sm:text-sm">
+                  <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                   Copy Link
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleShareOnFarcaster} className="flex-1">
-                  <Share className="mr-2 h-4 w-4" />
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShareOnFarcaster}
+                  className="flex-1 text-xs sm:text-sm"
+                >
+                  <Share2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                   Share on Farcaster
                 </Button>
               </div>
             </div>
           )}
 
-          <div className="flex justify-between items-center pt-4 border-t">
-            <p className="text-xs text-muted-foreground">Auto-closing in {autoCloseTimer}s</p>
-            <Button onClick={onClose} size="sm">
-              Close
-            </Button>
-          </div>
+          <Button onClick={onClose} className="w-full text-sm sm:text-base">
+            Close
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -2,67 +2,99 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Copy, Share, Check } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Copy, Share2, ExternalLink, QrCode } from "lucide-react"
 import { toast } from "sonner"
+import { QRCodeModal } from "./qr-code-modal"
 
 interface ShareButtonProps {
-  shareUrl: string
-  surveyTitle?: string
+  surveyId: string
+  surveyTitle: string
+  className?: string
   variant?: "default" | "outline" | "ghost"
   size?: "default" | "sm" | "lg"
-  showFarcaster?: boolean
 }
 
 export function ShareButton({
-  shareUrl,
+  surveyId,
   surveyTitle,
+  className,
   variant = "outline",
   size = "default",
-  showFarcaster = true,
 }: ShareButtonProps) {
-  const [copied, setCopied] = useState(false)
+  const [showQR, setShowQR] = useState(false)
+
+  const shareUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/respond/${surveyId}`
 
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl)
-      setCopied(true)
-      toast.success("Link copied to clipboard!")
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
+      toast.success("Survey link copied!")
+    } catch (error) {
       toast.error("Failed to copy link")
     }
   }
 
   const handleShareOnFarcaster = () => {
-    if (surveyTitle) {
-      const text = encodeURIComponent(`Voice your thoughts on: "${surveyTitle}" 🎙️`)
-      const url = encodeURIComponent(shareUrl)
-      window.open(`https://warpcast.com/~/compose?text=${text}&embeds[]=${url}`, "_blank")
+    const text = encodeURIComponent(`Voice your thoughts on "${surveyTitle}" 🎙️`)
+    const url = encodeURIComponent(shareUrl)
+    const farcasterUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${url}`
+
+    window.open(farcasterUrl, "_blank", "noopener,noreferrer")
+  }
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: surveyTitle,
+          text: "Voice your thoughts on this survey",
+          url: shareUrl,
+        })
+      } catch (error) {
+        // User cancelled or error occurred
+        console.log("Share cancelled")
+      }
+    } else {
+      handleCopyLink()
     }
   }
 
   return (
-    <div className="flex gap-2">
-      <Button variant={variant} size={size} onClick={handleCopyLink} className="flex-1">
-        {copied ? (
-          <>
-            <Check className="mr-2 h-4 w-4" />
-            Copied!
-          </>
-        ) : (
-          <>
-            <Copy className="mr-2 h-4 w-4" />
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant={variant} size={size} className={className}>
+            <Share2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="text-xs sm:text-sm">Share</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44 sm:w-48">
+          <DropdownMenuItem onClick={handleCopyLink} className="text-sm">
+            <Copy className="h-4 w-4 mr-2" />
             Copy Link
-          </>
-        )}
-      </Button>
+          </DropdownMenuItem>
 
-      {showFarcaster && (
-        <Button variant={variant} size={size} onClick={handleShareOnFarcaster} className="flex-1">
-          <Share className="mr-2 h-4 w-4" />
-          Share
-        </Button>
-      )}
-    </div>
+          <DropdownMenuItem onClick={handleShareOnFarcaster} className="text-sm">
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Share on Farcaster
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => setShowQR(true)} className="text-sm">
+            <QrCode className="h-4 w-4 mr-2" />
+            Show QR Code
+          </DropdownMenuItem>
+
+          {navigator.share && (
+            <DropdownMenuItem onClick={handleNativeShare} className="text-sm">
+              <Share2 className="h-4 w-4 mr-2" />
+              Native Share
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <QRCodeModal isOpen={showQR} onClose={() => setShowQR(false)} url={shareUrl} title={surveyTitle} />
+    </>
   )
 }

@@ -1,21 +1,23 @@
-interface OGMetaProps {
+export interface OGMetaProps {
   title: string
-  description?: string
-  url?: string
+  description: string
+  url: string
   image?: string
-  type?: string
+  type?: "website" | "article"
+  siteName?: string
 }
 
 export function generateOGMeta({
   title,
-  description = "Voice your thoughts in seconds with Audioform",
+  description,
   url,
-  image = "/images/audioform-og.png",
+  image,
   type = "website",
+  siteName = "Audioform",
 }: OGMetaProps) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://voxera.vercel.app"
-  const fullUrl = url ? `${siteUrl}${url}` : siteUrl
-  const fullImageUrl = image.startsWith("http") ? image : `${siteUrl}${image}`
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://voxera.vercel.app"
+  const fullUrl = url.startsWith("http") ? url : `${baseUrl}${url}`
+  const defaultImage = `${baseUrl}/images/audioform-logo.png`
 
   return {
     title,
@@ -24,30 +26,31 @@ export function generateOGMeta({
       title,
       description,
       url: fullUrl,
-      siteName: "Audioform",
+      siteName,
+      type,
       images: [
         {
-          url: fullImageUrl,
+          url: image || defaultImage,
           width: 1200,
           height: 630,
           alt: title,
         },
       ],
-      type,
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [fullImageUrl],
+      images: [image || defaultImage],
     },
   }
 }
 
 export function generateSurveyOGMeta(surveyTitle: string, surveyId: string) {
   return generateOGMeta({
-    title: `${surveyTitle} | Audioform`,
-    description: `Share your voice on: "${surveyTitle}". Quick audio responses in seconds.`,
-    url: `/s/${surveyId}`,
+    title: `${surveyTitle} - Voice Survey`,
+    description: "Share your thoughts with a quick voice response. Your voice matters!",
+    url: `/respond/${surveyId}`,
+    type: "article",
   })
 }

@@ -4,14 +4,13 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Loader2, ArrowLeft } from "lucide-react"
 import { RecordButton } from "@/components/audio/record-button"
 import { PlayPauseButton } from "@/components/audio/play-pause-button"
 import { ThankYouModal } from "@/components/survey/thank-you-modal"
 import { ShareButton } from "@/components/survey/share-button"
 import { supabaseBrowser } from "@/lib/supabaseClient"
 import { toast } from "sonner"
-import { generateSurveyOGMeta } from "@/utils/og-meta"
 import Head from "next/head"
 
 interface Survey {
@@ -34,7 +33,6 @@ export default function SurveyResponsePage() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
   const [showThankYou, setShowThankYou] = useState(false)
   const [hasSubmitted, setHasSubmitted] = useState(false)
 
@@ -73,8 +71,9 @@ export default function SurveyResponsePage() {
     }
   }
 
-  const handleRecordingComplete = (blob: Blob, url: string) => {
+  const handleRecordingComplete = (blob: Blob) => {
     setAudioBlob(blob)
+    const url = URL.createObjectURL(blob)
     setAudioUrl(url)
     setIsRecording(false)
   }
@@ -118,9 +117,9 @@ export default function SurveyResponsePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
           <p className="text-muted-foreground">Loading survey...</p>
         </div>
       </div>
@@ -129,112 +128,144 @@ export default function SurveyResponsePage() {
 
   if (!survey) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <p className="text-lg font-medium">Survey not found</p>
-          <Button onClick={() => router.push("/")}>Go Home</Button>
+          <Button onClick={() => router.push("/")} variant="outline">
+            Go Home
+          </Button>
         </div>
       </div>
     )
   }
 
-  const ogMeta = generateSurveyOGMeta(survey.title, surveyId)
-
   return (
     <>
       <Head>
-        <title>{ogMeta.title}</title>
-        <meta name="description" content={ogMeta.description} />
-        <meta property="og:title" content={ogMeta.openGraph.title} />
-        <meta property="og:description" content={ogMeta.openGraph.description} />
-        <meta property="og:url" content={ogMeta.openGraph.url} />
-        <meta property="og:image" content={ogMeta.openGraph.images[0].url} />
-        <meta property="og:type" content={ogMeta.openGraph.type} />
-        <meta name="twitter:card" content={ogMeta.twitter.card} />
-        <meta name="twitter:title" content={ogMeta.twitter.title} />
-        <meta name="twitter:description" content={ogMeta.twitter.description} />
-        <meta name="twitter:image" content={ogMeta.twitter.images[0]} />
+        <title>{survey.title} | Voice Survey</title>
+        <meta name="description" content={survey.description || survey.prompt} />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="max-w-2xl mx-auto pt-8 pb-16">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{survey.title}</h1>
-            {survey.description && <p className="text-gray-600 text-sm sm:text-base">{survey.description}</p>}
-          </div>
-
-          {/* Main Survey Card */}
-          <Card className="shadow-lg border-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg sm:text-xl text-center">{survey.prompt}</CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-              {/* Recording Section */}
-              <div className="text-center space-y-4">
-                <RecordButton
-                  onRecordingComplete={handleRecordingComplete}
-                  disabled={submitting || hasSubmitted}
-                  isRecording={isRecording}
-                  onRecordingStart={() => setIsRecording(true)}
-                />
-
-                {isRecording && (
-                  <p className="text-sm text-blue-600 animate-pulse">Recording... Speak clearly into your microphone</p>
-                )}
-              </div>
-
-              {/* Audio Playback */}
-              {audioUrl && !isRecording && (
-                <div className="flex items-center justify-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                  <PlayPauseButton
-                    audioUrl={audioUrl}
-                    isPlaying={isPlaying}
-                    onPlayStateChange={setIsPlaying}
-                    disabled={submitting}
-                  />
-                  <span className="text-sm text-gray-600">Preview your response</span>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              {audioBlob && !hasSubmitted && (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={submitting || isRecording}
-                  className="w-full h-12 text-base font-medium"
-                  size="lg"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Submitting Response...
-                    </>
-                  ) : (
-                    "Submit Response"
-                  )}
-                </Button>
-              )}
-
-              {/* Share Section */}
-              <div className="border-t pt-6">
-                <div className="text-center space-y-3">
-                  <p className="text-sm font-medium text-gray-700">Share this survey with others:</p>
-                  <ShareButton shareUrl={shareUrl} surveyTitle={survey.title} size="sm" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Thank You Modal */}
-          <ThankYouModal
-            isOpen={showThankYou}
-            onClose={() => setShowThankYou(false)}
-            surveyTitle={survey.title}
-            shareUrl={shareUrl}
-          />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        {/* Mobile Header */}
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="font-semibold text-sm truncate mx-2 flex-1">{survey.title}</h1>
+          <ShareButton surveyId={surveyId} surveyTitle={survey.title} size="sm" />
         </div>
+
+        {/* Main Content */}
+        <div className="px-4 py-6 pb-20">
+          <div className="max-w-lg mx-auto space-y-6">
+            {/* Survey Info Card */}
+            <Card className="shadow-lg border-0 bg-white/95 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg sm:text-xl leading-tight">{survey.title}</CardTitle>
+                {survey.description && (
+                  <p className="text-sm text-muted-foreground leading-relaxed">{survey.description}</p>
+                )}
+              </CardHeader>
+
+              <CardContent className="space-y-6">
+                {/* Question Prompt */}
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-base font-medium text-blue-900 leading-relaxed">{survey.prompt}</p>
+                </div>
+
+                {/* Recording Section */}
+                <div className="text-center space-y-4">
+                  <RecordButton
+                    onRecordingComplete={handleRecordingComplete}
+                    disabled={submitting || hasSubmitted}
+                    onRecordingStart={() => setIsRecording(true)}
+                    className="w-full max-w-xs mx-auto"
+                  />
+
+                  {isRecording && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <p className="text-sm text-red-600 font-medium">Recording...</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Speak clearly into your microphone</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Audio Playback */}
+                {audioUrl && !isRecording && (
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-center">
+                      <PlayPauseButton audioUrl={audioUrl} disabled={submitting} />
+                    </div>
+                    <p className="text-xs text-center text-muted-foreground">Preview your response</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAudioBlob(null)
+                        setAudioUrl(null)
+                      }}
+                      className="w-full"
+                      disabled={submitting}
+                    >
+                      Record Again
+                    </Button>
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                {audioBlob && !hasSubmitted && (
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitting || isRecording}
+                    className="w-full h-12 text-base font-medium bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    size="lg"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Submit Response"
+                    )}
+                  </Button>
+                )}
+
+                {hasSubmitted && (
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <p className="text-green-800 font-medium">Response submitted successfully!</p>
+                    <p className="text-sm text-green-600 mt-1">Thank you for sharing your thoughts.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Share Section */}
+            {!hasSubmitted && (
+              <Card className="bg-white/80 backdrop-blur-sm border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="text-center space-y-3">
+                    <p className="text-sm font-medium text-gray-700">Share this survey:</p>
+                    <ShareButton surveyId={surveyId} surveyTitle={survey.title} className="w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        {/* Thank You Modal */}
+        <ThankYouModal
+          isOpen={showThankYou}
+          onClose={() => setShowThankYou(false)}
+          surveyTitle={survey.title}
+          shareUrl={shareUrl}
+        />
       </div>
     </>
   )
