@@ -1,149 +1,116 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Loader2 } from "lucide-react"
 import { RecordButton } from "@/components/audio/record-button"
 import { PlayPauseButton } from "@/components/audio/play-pause-button"
-import { EmailCaptureField } from "@/components/survey/email-capture-field"
-import { SwipeNavigator } from "@/components/mobile/swipe-navigator"
-import { useMobile } from "@/hooks/use-mobile"
-import { ArrowLeft, ArrowRight, CheckCircle } from "lucide-react"
+import { ThankYouModal } from "@/components/survey/thank-you-modal"
+import { ShareButton } from "@/components/survey/share-button"
+import { supabaseBrowser } from "@/lib/supabaseClient"
+import { toast } from "sonner"
+import { generateSurveyOGMeta } from "@/utils/og-meta"
+import Head from "next/head"
 
-interface SurveyQuestion {
-  id: string
-  text: string
-}
-
-interface SurveyData {
+interface Survey {
   id: string
   title: string
-  questions: SurveyQuestion[]
-  branding?: {
-    logoUrl?: string
-    accentColor?: string
-  }
+  description?: string
+  prompt: string
+  created_at: string
+  expires_at?: string
 }
 
-export default function RespondPage({ params }: { params: { id: string } }) {
-  const surveyId = params.id
-  const isMobile = useMobile()
+export default function SurveyResponsePage() {
+  const params = useParams()
+  const router = useRouter()
+  const surveyId = params.id as string
 
-  // State for survey data
-  const [survey, setSurvey] = useState<SurveyData | null>(null)
+  const [survey, setSurvey] = useState<Survey | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // State for response process
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [responses, setResponses] = useState<Record<string, Blob | null>>({})
-  const [audioUrls, setAudioUrls] = useState<Record<string, string>>({})
-  const [email, setEmail] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [completed, setCompleted] = useState(false)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [showThankYou, setShowThankYou] = useState(false)
+  const [hasSubmitted, setHasSubmitted] = useState(false)
 
-  // Mock fetch survey data
+  const shareUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://voxera.vercel.app"}/respond/${surveyId}`
+
   useEffect(() => {
-    const fetchSurvey = async () => {
-      try {
-        // In a real app, this would be an API call
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        // Mock data
-        const mockSurvey: SurveyData = {
-          id: surveyId,
-          title: "Customer Feedback Survey",
-          questions: [
-            { id: "1", text: "How would you describe your experience with our product?" },
-            { id: "2", text: "What features do you find most valuable?" },
-            { id: "3", text: "How can we improve our product to better meet your needs?" },
-          ],
-          branding: {
-            accentColor: "#3B82F6",
-          },
-        }
-
-        setSurvey(mockSurvey)
-
-        // Initialize responses object
-        const initialResponses: Record<string, Blob | null> = {}
-        mockSurvey.questions.forEach((q) => {
-          initialResponses[q.id] = null
-        })
-        setResponses(initialResponses)
-      } catch (err) {
-        setError("Failed to load survey. Please try again later.")
-        console.error("Error fetching survey:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchSurvey()
   }, [surveyId])
 
-  const handleRecordingComplete = (questionId: string, audioBlob: Blob) => {
-    // Update responses
-    setResponses((prev) => ({
-      ...prev,
-      [questionId]: audioBlob,
-    }))
+  const fetchSurvey = async () => {
+    try {
+      const { data, error } = await supabaseBrowser.from("demo_surveys").select("*").eq("id", surveyId).single()
 
-    // Create URL for playback
-    const url = URL.createObjectURL(audioBlob)
-    setAudioUrls((prev) => ({
-      ...prev,
-      [questionId]: url,
-    }))
-  }
+      if (error) throw error
 
-  const handleEmailCapture = (capturedEmail: string) => {
-    setEmail(capturedEmail)
-  }
+      if (!data) {
+        toast.error("Survey not found")
+        router.push("/")
+        return
+      }
 
-  const handleNext = () => {
-    if (currentQuestionIndex < (survey?.questions.length || 0) - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
+      // Check if survey has expired
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        toast.error("This survey has expired")
+        router.push("/")
+        return
+      }
+
+      setSurvey(data)
+    } catch (error) {
+      console.error("Error fetching survey:", error)
+      toast.error("Failed to load survey")
+      router.push("/")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1)
-    }
+  const handleRecordingComplete = (blob: Blob, url: string) => {
+    setAudioBlob(blob)
+    setAudioUrl(url)
+    setIsRecording(false)
   }
 
   const handleSubmit = async () => {
-    if (!survey) return
+    if (!audioBlob || !survey || submitting || hasSubmitted) return
 
     setSubmitting(true)
 
     try {
-      // Check if all questions have responses
-      const allQuestionsAnswered = survey.questions.every((q) => responses[q.id])
+      // Upload audio file
+      const fileName = `response_${surveyId}_${Date.now()}.webm`
+      const { data: uploadData, error: uploadError } = await supabaseBrowser.storage
+        .from("audio-responses")
+        .upload(fileName, audioBlob, {
+          contentType: "audio/webm",
+          upsert: false,
+        })
 
-      if (!allQuestionsAnswered) {
-        alert("Please answer all questions before submitting.")
-        setSubmitting(false)
-        return
-      }
+      if (uploadError) throw uploadError
 
-      if (!email) {
-        alert("Please provide your email before submitting.")
-        setSubmitting(false)
-        return
-      }
+      // Save response to database
+      const { error: responseError } = await supabaseBrowser.from("survey_responses").insert({
+        survey_id: surveyId,
+        audio_url: uploadData.path,
+        submitted_at: new Date().toISOString(),
+      })
 
-      // In a real app, this would upload each audio blob to storage
-      // and then submit the response data to the API
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      if (responseError) throw responseError
 
-      setCompleted(true)
-    } catch (err) {
-      console.error("Error submitting responses:", err)
-      alert("Failed to submit responses. Please try again.")
+      setHasSubmitted(true)
+      setShowThankYou(true)
+      toast.success("Response submitted successfully!")
+    } catch (error) {
+      console.error("Error submitting response:", error)
+      toast.error("Failed to submit response. Please try again.")
     } finally {
       setSubmitting(false)
     }
@@ -151,205 +118,124 @@ export default function RespondPage({ params }: { params: { id: string } }) {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-16 flex justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Loading survey...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          <p className="text-muted-foreground">Loading survey...</p>
         </div>
       </div>
     )
   }
 
-  if (error || !survey) {
+  if (!survey) {
     return (
-      <div className="container mx-auto px-4 py-16">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-red-600 mb-2">Error</h2>
-              <p>{error || "Survey not found"}</p>
-              <Button className="mt-4" onClick={() => window.location.reload()}>
-                Try Again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-lg font-medium">Survey not found</p>
+          <Button onClick={() => router.push("/")}>Go Home</Button>
+        </div>
       </div>
     )
   }
 
-  if (completed) {
-    return (
-      <div className="container mx-auto px-4 py-16 max-w-md">
-        <Card>
-          <CardContent className="pt-6 flex flex-col items-center text-center">
-            <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Thank You!</h2>
-            <p className="mb-6">Your responses have been submitted successfully.</p>
-            <Button onClick={() => (window.location.href = "/")}>Return Home</Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  const currentQuestion = survey.questions[currentQuestionIndex]
-  const hasRecorded = !!responses[currentQuestion.id]
-  const isLastQuestion = currentQuestionIndex === survey.questions.length - 1
-
-  const questionCards = survey.questions.map((question, index) => (
-    <div key={question.id} className="w-full">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">
-            Question {index + 1} of {survey.questions.length}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg mb-6">{question.text}</p>
-
-          {!audioUrls[question.id] ? (
-            <RecordButton
-              onRecordingComplete={(audioBlob) => handleRecordingComplete(question.id, audioBlob)}
-              className="w-full"
-            />
-          ) : (
-            <div className="flex flex-col items-center">
-              <PlayPauseButton audioUrl={audioUrls[question.id]} className="mb-4" />
-              <Button
-                variant="outline"
-                onClick={() => {
-                  // Clear the response and URL
-                  setResponses((prev) => ({ ...prev, [question.id]: null }))
-
-                  // Revoke the object URL to avoid memory leaks
-                  URL.revokeObjectURL(audioUrls[question.id])
-
-                  setAudioUrls((prev) => {
-                    const newUrls = { ...prev }
-                    delete newUrls[question.id]
-                    return newUrls
-                  })
-                }}
-              >
-                Record Again
-              </Button>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          {!isMobile && (
-            <>
-              <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Previous
-              </Button>
-
-              {!isLastQuestion ? (
-                <Button onClick={handleNext} disabled={!hasRecorded}>
-                  Next
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              ) : (
-                <Button onClick={() => setCurrentQuestionIndex(survey.questions.length)} disabled={!hasRecorded}>
-                  Continue
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              )}
-            </>
-          )}
-        </CardFooter>
-      </Card>
-    </div>
-  ))
-
-  // Add email capture as the last "question"
-  questionCards.push(
-    <div key="email-capture" className="w-full">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">Almost Done!</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-6">Please provide your email to complete the survey.</p>
-          <EmailCaptureField onEmailCapture={handleEmailCapture} />
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          {!isMobile && (
-            <>
-              <Button variant="outline" onClick={() => setCurrentQuestionIndex(survey.questions.length - 1)}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-
-              <Button onClick={handleSubmit} disabled={!email || submitting}>
-                {submitting ? "Submitting..." : "Submit Responses"}
-              </Button>
-            </>
-          )}
-        </CardFooter>
-      </Card>
-    </div>,
-  )
+  const ogMeta = generateSurveyOGMeta(survey.title, surveyId)
 
   return (
-    <div
-      className="container mx-auto px-4 py-8 max-w-xl"
-      style={{
-        // Apply branding if available
-        ...(survey.branding?.accentColor &&
-          ({
-            "--accent-color": survey.branding.accentColor,
-          } as React.CSSProperties)),
-      }}
-    >
-      <div className="mb-8 text-center">
-        {survey.branding?.logoUrl && (
-          <img src={survey.branding.logoUrl || "/placeholder.svg"} alt="Survey Logo" className="h-12 mx-auto mb-4" />
-        )}
-        <h1 className="text-2xl font-bold">{survey.title}</h1>
-      </div>
+    <>
+      <Head>
+        <title>{ogMeta.title}</title>
+        <meta name="description" content={ogMeta.description} />
+        <meta property="og:title" content={ogMeta.openGraph.title} />
+        <meta property="og:description" content={ogMeta.openGraph.description} />
+        <meta property="og:url" content={ogMeta.openGraph.url} />
+        <meta property="og:image" content={ogMeta.openGraph.images[0].url} />
+        <meta property="og:type" content={ogMeta.openGraph.type} />
+        <meta name="twitter:card" content={ogMeta.twitter.card} />
+        <meta name="twitter:title" content={ogMeta.twitter.title} />
+        <meta name="twitter:description" content={ogMeta.twitter.description} />
+        <meta name="twitter:image" content={ogMeta.twitter.images[0]} />
+      </Head>
 
-      {isMobile ? (
-        <>
-          <SwipeNavigator currentIndex={currentQuestionIndex} onIndexChange={setCurrentQuestionIndex} className="mb-6">
-            {questionCards}
-          </SwipeNavigator>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-2xl mx-auto pt-8 pb-16">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{survey.title}</h1>
+            {survey.description && <p className="text-gray-600 text-sm sm:text-base">{survey.description}</p>}
+          </div>
 
-          {currentQuestionIndex === survey.questions.length ? (
-            <Button className="w-full" onClick={handleSubmit} disabled={!email || submitting}>
-              {submitting ? "Submitting..." : "Submit Responses"}
-            </Button>
-          ) : (
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={handlePrevious}
-                disabled={currentQuestionIndex === 0}
-                className="w-1/3"
-              >
-                Previous
-              </Button>
+          {/* Main Survey Card */}
+          <Card className="shadow-lg border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg sm:text-xl text-center">{survey.prompt}</CardTitle>
+            </CardHeader>
 
-              {!isLastQuestion ? (
-                <Button onClick={handleNext} disabled={!hasRecorded} className="w-1/3">
-                  Next
-                </Button>
-              ) : (
+            <CardContent className="space-y-6">
+              {/* Recording Section */}
+              <div className="text-center space-y-4">
+                <RecordButton
+                  onRecordingComplete={handleRecordingComplete}
+                  disabled={submitting || hasSubmitted}
+                  isRecording={isRecording}
+                  onRecordingStart={() => setIsRecording(true)}
+                />
+
+                {isRecording && (
+                  <p className="text-sm text-blue-600 animate-pulse">Recording... Speak clearly into your microphone</p>
+                )}
+              </div>
+
+              {/* Audio Playback */}
+              {audioUrl && !isRecording && (
+                <div className="flex items-center justify-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <PlayPauseButton
+                    audioUrl={audioUrl}
+                    isPlaying={isPlaying}
+                    onPlayStateChange={setIsPlaying}
+                    disabled={submitting}
+                  />
+                  <span className="text-sm text-gray-600">Preview your response</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              {audioBlob && !hasSubmitted && (
                 <Button
-                  onClick={() => setCurrentQuestionIndex(survey.questions.length)}
-                  disabled={!hasRecorded}
-                  className="w-1/3"
+                  onClick={handleSubmit}
+                  disabled={submitting || isRecording}
+                  className="w-full h-12 text-base font-medium"
+                  size="lg"
                 >
-                  Continue
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Submitting Response...
+                    </>
+                  ) : (
+                    "Submit Response"
+                  )}
                 </Button>
               )}
-            </div>
-          )}
-        </>
-      ) : (
-        questionCards[currentQuestionIndex === survey.questions.length ? survey.questions.length : currentQuestionIndex]
-      )}
-    </div>
+
+              {/* Share Section */}
+              <div className="border-t pt-6">
+                <div className="text-center space-y-3">
+                  <p className="text-sm font-medium text-gray-700">Share this survey with others:</p>
+                  <ShareButton shareUrl={shareUrl} surveyTitle={survey.title} size="sm" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Thank You Modal */}
+          <ThankYouModal
+            isOpen={showThankYou}
+            onClose={() => setShowThankYou(false)}
+            surveyTitle={survey.title}
+            shareUrl={shareUrl}
+          />
+        </div>
+      </div>
+    </>
   )
 }

@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/utils/supabase/server"
+import { supabaseServer } from "@/lib/supabaseClient"
 import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 
@@ -13,7 +13,7 @@ export async function createDemoSession(data: {
   email?: string
 }) {
   const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
+  const supabase = supabaseServer(cookieStore)
 
   try {
     // If we have an email but no userId, create or get the user first
@@ -46,6 +46,7 @@ export async function createDemoSession(data: {
       user_id: userId,
       survey_id: data.surveyId,
       expires_at: expiresAt.toISOString(),
+      email: data.email,
     })
 
     if (error) throw error
@@ -62,12 +63,13 @@ export async function createDemoSession(data: {
  */
 export async function getDemoSessionStatus(surveyId: string) {
   const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
+  const supabase = supabaseServer(cookieStore)
 
   try {
+    // First, get the demo session
     const { data, error } = await supabase
       .from("demo_sessions")
-      .select("*, surveys(is_active)")
+      .select("*")
       .eq("survey_id", surveyId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -81,10 +83,23 @@ export async function getDemoSessionStatus(surveyId: string) {
       throw error
     }
 
+    // Then, get the survey to check if it exists
+    const { data: survey, error: surveyError } = await supabase.from("surveys").select("*").eq("id", surveyId).single()
+
+    if (surveyError) {
+      if (surveyError.code === "PGRST116") {
+        // No survey found
+        return { exists: false }
+      }
+      throw surveyError
+    }
+
     const now = new Date()
     const expiresAt = new Date(data.expires_at)
     const isExpired = now >= expiresAt
-    const isActive = data.surveys?.is_active || false
+
+    // Default to true if the survey exists (since we don't have an is_active column)
+    const isActive = true
 
     return {
       exists: true,
@@ -104,7 +119,7 @@ export async function getDemoSessionStatus(surveyId: string) {
  */
 export async function markDemoSessionNotified(surveyId: string) {
   const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
+  const supabase = supabaseServer(cookieStore)
 
   try {
     const { error } = await supabase.from("demo_sessions").update({ notified: true }).eq("survey_id", surveyId)

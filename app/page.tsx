@@ -1,277 +1,219 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Mic, Users, Share, Zap, ArrowRight, Play } from "lucide-react"
 import Link from "next/link"
-import { BarChart3, Users, Zap, Mic } from "lucide-react"
-import { Header } from "@/components/layout/header"
+import Head from "next/head"
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
+    <>
+      <Head>
+        <title>Audioform - Voice Survey Platform</title>
+        <meta
+          name="description"
+          content="Create engaging voice surveys and collect authentic audio responses. Perfect for feedback, research, and community engagement."
+        />
+      </Head>
 
-      <main className="flex-1">
-        <section className="py-20 bg-gradient-to-b from-white to-blue-50">
-          <div className="container mx-auto px-4 text-center">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Voice-First Surveys</h2>
-            <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-3xl mx-auto">
-              Create text questions. Get voice answers. Unlock insights from the human voice.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link href="/signup">
-                <Button size="lg" className="w-full sm:w-auto">
-                  Get Started for Free
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        {/* Header */}
+        <header className="container mx-auto px-4 py-6">
+          <nav className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <Mic className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-gray-900">Audioform</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Link href="/demo">
+                <Button variant="outline" className="hidden sm:flex">
+                  Try Demo
                 </Button>
               </Link>
               <Link href="/demo">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  See a Demo
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  Get Started
+                </Button>
+              </Link>
+            </div>
+          </nav>
+        </header>
+
+        {/* Hero Section */}
+        <section className="container mx-auto px-4 py-16 text-center">
+          <div className="max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border mb-8">
+              <Zap className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-700">24-Hour Free Demo</span>
+            </div>
+
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+              Voice Surveys That
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                {" "}
+                Actually Engage
+              </span>
+            </h1>
+
+            <p className="text-xl sm:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
+              Create authentic voice surveys in seconds. Collect genuine audio responses that reveal insights text never
+              could.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+              <Link href="/demo">
+                <Button
+                  size="lg"
+                  className="h-14 px-8 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  <Mic className="mr-2 h-5 w-5" />
+                  Create Your First Survey
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+
+              <Button variant="outline" size="lg" className="h-14 px-8 text-lg">
+                <Play className="mr-2 h-5 w-5" />
+                Watch Demo
+              </Button>
+            </div>
+
+            {/* Demo Preview */}
+            <div className="relative max-w-4xl mx-auto">
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border p-8">
+                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Mic className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <p className="text-gray-600 font-medium">Interactive Demo Preview</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <section className="container mx-auto px-4 py-20">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">Why Voice Surveys Work Better</h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Audio responses capture emotion, tone, and nuance that text simply can't convey.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Mic className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Authentic Responses</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Capture genuine emotions and spontaneous thoughts that written surveys miss.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Zap className="h-8 w-8 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Lightning Fast</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Create and share surveys in under 60 seconds. No complex setup required.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Share className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Easy Sharing</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Share via link, QR code, or social media. Works on any device with a microphone.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Users className="h-8 w-8 text-orange-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Higher Engagement</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Voice surveys get 3x more responses than traditional text-based forms.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Zap className="h-8 w-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Real-time Insights</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Get immediate feedback and analyze responses as they come in.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Mic className="h-8 w-8 text-indigo-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Mobile Optimized</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Perfect for mobile users. Record and submit responses in seconds.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="container mx-auto px-4 py-20">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-12 text-white">
+              <h2 className="text-4xl sm:text-5xl font-bold mb-6">Ready to Hear What Your Audience Really Thinks?</h2>
+              <p className="text-xl mb-8 opacity-90">
+                Start collecting authentic voice responses today. No signup required for the 24-hour demo.
+              </p>
+              <Link href="/demo">
+                <Button size="lg" variant="secondary" className="h-14 px-8 text-lg font-semibold">
+                  <Mic className="mr-2 h-5 w-5" />
+                  Try Audioform Free
+                  <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
             </div>
           </div>
         </section>
 
-        <section className="py-16 bg-white">
-          <div className="container mx-auto px-4">
-            <h3 className="text-3xl font-bold text-center mb-12">How It Works</h3>
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="flex flex-col items-center text-center p-6 rounded-lg border">
-                <div className="bg-blue-100 p-4 rounded-full mb-4">
-                  <Mic className="h-8 w-8 text-blue-600" />
-                </div>
-                <h4 className="text-xl font-semibold mb-2">Create Surveys</h4>
-                <p className="text-gray-600">Design text-based questions that prompt thoughtful voice responses.</p>
+        {/* Footer */}
+        <footer className="container mx-auto px-4 py-12 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between items-center">
+            <div className="flex items-center gap-2 mb-4 sm:mb-0">
+              <div className="w-6 h-6 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <Mic className="h-4 w-4 text-white" />
               </div>
-
-              <div className="flex flex-col items-center text-center p-6 rounded-lg border">
-                <div className="bg-blue-100 p-4 rounded-full mb-4">
-                  <Users className="h-8 w-8 text-blue-600" />
-                </div>
-                <h4 className="text-xl font-semibold mb-2">Collect Responses</h4>
-                <p className="text-gray-600">Respondents record audio answers, capturing tone, emotion, and nuance.</p>
-              </div>
-
-              <div className="flex flex-col items-center text-center p-6 rounded-lg border">
-                <div className="bg-blue-100 p-4 rounded-full mb-4">
-                  <BarChart3 className="h-8 w-8 text-blue-600" />
-                </div>
-                <h4 className="text-xl font-semibold mb-2">Analyze Insights</h4>
-                <p className="text-gray-600">Unlock deeper understanding with transcription and sentiment analysis.</p>
-              </div>
+              <span className="font-semibold text-gray-900">Audioform</span>
             </div>
+            <p className="text-gray-600 text-sm">© 2024 Audioform. Built for authentic conversations.</p>
           </div>
-        </section>
-
-        <section className="py-16 bg-blue-50">
-          <div className="container mx-auto px-4">
-            <h3 className="text-3xl font-bold text-center mb-12">Choose Your Plan</h3>
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="bg-white p-8 rounded-lg border shadow-sm flex flex-col">
-                <h4 className="text-2xl font-bold mb-2">Free</h4>
-                <p className="text-gray-600 mb-6">Perfect for individuals and small projects</p>
-                <div className="text-3xl font-bold mb-6">$0</div>
-                <ul className="space-y-3 mb-8 flex-1">
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Up to 5 questions per survey
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Voice recording & playback
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Responder email capture
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Shareable survey links
-                  </li>
-                </ul>
-                <Link href="/signup" className="mt-auto">
-                  <Button className="w-full">Get Started</Button>
-                </Link>
-              </div>
-
-              <div className="bg-white p-8 rounded-lg border shadow-sm flex flex-col relative">
-                <div className="absolute top-0 right-0 bg-blue-600 text-white px-3 py-1 text-sm font-medium rounded-bl-lg rounded-tr-lg">
-                  Popular
-                </div>
-                <h4 className="text-2xl font-bold mb-2">Pro</h4>
-                <p className="text-gray-600 mb-6">For professionals and growing teams</p>
-                <div className="text-3xl font-bold mb-6">
-                  $29<span className="text-lg font-normal">/mo</span>
-                </div>
-                <ul className="space-y-3 mb-8 flex-1">
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Unlimited questions
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Transcription
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Sentiment analysis
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Custom branding
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Team seats
-                  </li>
-                </ul>
-                <Link href="/signup?plan=pro" className="mt-auto">
-                  <Button className="w-full">Choose Pro</Button>
-                </Link>
-              </div>
-
-              <div className="bg-white p-8 rounded-lg border shadow-sm flex flex-col">
-                <h4 className="text-2xl font-bold mb-2">Enterprise</h4>
-                <p className="text-gray-600 mb-6">For organizations with advanced needs</p>
-                <div className="text-3xl font-bold mb-6">Custom</div>
-                <ul className="space-y-3 mb-8 flex-1">
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Everything in Pro
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Live-Board Event Mode
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    QR-Code Generation
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    Real-Time Dashboard
-                  </li>
-                  <li className="flex items-center">
-                    <Zap className="h-5 w-5 text-blue-600 mr-2" />
-                    SSO + RBAC
-                  </li>
-                </ul>
-                <Link href="/contact-sales" className="mt-auto">
-                  <Button variant="outline" className="w-full">
-                    Contact Sales
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="py-16 bg-white">
-          <div className="container mx-auto px-4 text-center">
-            <h3 className="text-3xl font-bold mb-6">Join the EchoBoard Community</h3>
-            <p className="text-xl text-gray-600 mb-10 max-w-3xl mx-auto">
-              Participate in public audio Q&A forums. Ask questions, provide answers, and earn recognition.
-            </p>
-            <Link href="/echoboard">
-              <Button size="lg">Explore EchoBoard</Button>
-            </Link>
-          </div>
-        </section>
-      </main>
-
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center mb-4">
-                <Mic className="h-6 w-6 mr-2" />
-                <h3 className="text-xl font-bold">Audioform</h3>
-              </div>
-              <p className="text-gray-400">Voice-first surveys for deeper insights.</p>
-            </div>
-
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Product</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="/features" className="text-gray-400 hover:text-white">
-                    Features
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/pricing" className="text-gray-400 hover:text-white">
-                    Pricing
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/echoboard" className="text-gray-400 hover:text-white">
-                    EchoBoard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/enterprise" className="text-gray-400 hover:text-white">
-                    Enterprise
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Resources</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="/docs" className="text-gray-400 hover:text-white">
-                    Documentation
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/guides" className="text-gray-400 hover:text-white">
-                    Guides
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/api" className="text-gray-400 hover:text-white">
-                    API
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/blog" className="text-gray-400 hover:text-white">
-                    Blog
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Company</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="/about" className="text-gray-400 hover:text-white">
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="text-gray-400 hover:text-white">
-                    Contact
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/privacy" className="text-gray-400 hover:text-white">
-                    Privacy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/terms" className="text-gray-400 hover:text-white">
-                    Terms
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
-            <p>&copy; {new Date().getFullYear()} Audioform. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </>
   )
 }
