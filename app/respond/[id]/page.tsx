@@ -4,25 +4,25 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Loader2, ArrowLeft } from "lucide-react"
 import { RecordButton } from "@/components/audio/record-button"
 import { PlayPauseButton } from "@/components/audio/play-pause-button"
-import { ThankYouModal } from "@/components/survey/thank-you-modal"
-import { ShareButton } from "@/components/survey/share-button"
-import { supabaseBrowser } from "@/lib/supabaseClient"
+import { supabase } from "@/lib/supabase/client"
+import { submitResponse } from "@/lib/actions/submitResponse"
 import { toast } from "sonner"
 import Head from "next/head"
 
 interface Survey {
   id: string
   title: string
-  description?: string
-  prompt: string
+  questions: any[]
   created_at: string
-  expires_at?: string
+  expires_at: string
+  is_active: boolean
 }
 
-export default function SurveyResponsePage() {
+export default function RespondPage() {
   const params = useParams()
   const router = useRouter()
   const surveyId = params.id as string
@@ -33,10 +33,9 @@ export default function SurveyResponsePage() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
+  const [email, setEmail] = useState("")
   const [showThankYou, setShowThankYou] = useState(false)
   const [hasSubmitted, setHasSubmitted] = useState(false)
-
-  const shareUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://voxera.vercel.app"}/respond/${surveyId}`
 
   useEffect(() => {
     fetchSurvey()
@@ -44,9 +43,14 @@ export default function SurveyResponsePage() {
 
   const fetchSurvey = async () => {
     try {
-      const { data, error } = await supabaseBrowser.from("demo_surveys").select("*").eq("id", surveyId).single()
+      const { data, error } = await supabase.from("surveys").select("*").eq("id", surveyId).single()
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching survey:", error)
+        toast.error("Survey not found")
+        router.push("/")
+        return
+      }
 
       if (!data) {
         toast.error("Survey not found")
@@ -57,6 +61,13 @@ export default function SurveyResponsePage() {
       // Check if survey has expired
       if (data.expires_at && new Date(data.expires_at) < new Date()) {
         toast.error("This survey has expired")
+        router.push("/")
+        return
+      }
+
+      // Check if survey is active
+      if (!data.is_active) {
+        toast.error("This survey is no longer active")
         router.push("/")
         return
       }
@@ -84,32 +95,25 @@ export default function SurveyResponsePage() {
     setSubmitting(true)
 
     try {
-      // Upload audio file
-      const fileName = `response_${surveyId}_${Date.now()}.webm`
-      const { data: uploadData, error: uploadError } = await supabaseBrowser.storage
-        .from("audio-responses")
-        .upload(fileName, audioBlob, {
-          contentType: "audio/webm",
-          upsert: false,
-        })
+      // Create form data for server action
+      const formData = new FormData()
+      formData.append("surveyId", surveyId)
+      formData.append("questionId", survey.questions[0].id || "1")
+      formData.append("audio", audioBlob)
+      if (email) formData.append("email", email)
 
-      if (uploadError) throw uploadError
+      const result = await submitResponse(formData)
 
-      // Save response to database
-      const { error: responseError } = await supabaseBrowser.from("survey_responses").insert({
-        survey_id: surveyId,
-        audio_url: uploadData.path,
-        submitted_at: new Date().toISOString(),
-      })
-
-      if (responseError) throw responseError
+      if (!result.success) {
+        throw new Error(result.error)
+      }
 
       setHasSubmitted(true)
       setShowThankYou(true)
       toast.success("Response submitted successfully!")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting response:", error)
-      toast.error("Failed to submit response. Please try again.")
+      toast.error(error.message || "Failed to submit response. Please try again.")
     } finally {
       setSubmitting(false)
     }
@@ -139,11 +143,14 @@ export default function SurveyResponsePage() {
     )
   }
 
+  // Get the question text
+  const questionText = survey.questions && survey.questions.length > 0 ? survey.questions[0].text : survey.title
+
   return (
     <>
       <Head>
         <title>{survey.title} | Voice Survey</title>
-        <meta name="description" content={survey.description || survey.prompt} />
+        <meta name="description" content={questionText} />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
 
@@ -154,7 +161,6 @@ export default function SurveyResponsePage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="font-semibold text-sm truncate mx-2 flex-1">{survey.title}</h1>
-          <ShareButton surveyId={surveyId} surveyTitle={survey.title} size="sm" />
         </div>
 
         {/* Main Content */}
@@ -164,15 +170,12 @@ export default function SurveyResponsePage() {
             <Card className="shadow-lg border-0 bg-white/95 backdrop-blur-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg sm:text-xl leading-tight">{survey.title}</CardTitle>
-                {survey.description && (
-                  <p className="text-sm text-muted-foreground leading-relaxed">{survey.description}</p>
-                )}
               </CardHeader>
 
               <CardContent className="space-y-6">
                 {/* Question Prompt */}
                 <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-base font-medium text-blue-900 leading-relaxed">{survey.prompt}</p>
+                  <p className="text-base font-medium text-blue-900 leading-relaxed">{questionText}</p>
                 </div>
 
                 {/* Recording Section */}
@@ -217,6 +220,21 @@ export default function SurveyResponsePage() {
                   </div>
                 )}
 
+                {/* Email Input (Optional) */}
+                {audioBlob && !hasSubmitted && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600">Optional: Leave your email to get notified of replies</p>
+                    <Input
+                      type="email"
+                      placeholder="your@email.com (optional)"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={submitting}
+                      className="mb-4"
+                    />
+                  </div>
+                )}
+
                 {/* Submit Button */}
                 {audioBlob && !hasSubmitted && (
                   <Button
@@ -240,32 +258,15 @@ export default function SurveyResponsePage() {
                   <div className="text-center p-4 bg-green-50 rounded-lg">
                     <p className="text-green-800 font-medium">Response submitted successfully!</p>
                     <p className="text-sm text-green-600 mt-1">Thank you for sharing your thoughts.</p>
+                    <Button onClick={() => router.push("/")} className="mt-4 bg-green-600 hover:bg-green-700" size="sm">
+                      Return Home
+                    </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
-
-            {/* Share Section */}
-            {!hasSubmitted && (
-              <Card className="bg-white/80 backdrop-blur-sm border border-gray-200">
-                <CardContent className="p-4">
-                  <div className="text-center space-y-3">
-                    <p className="text-sm font-medium text-gray-700">Share this survey:</p>
-                    <ShareButton surveyId={surveyId} surveyTitle={survey.title} className="w-full" />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
-
-        {/* Thank You Modal */}
-        <ThankYouModal
-          isOpen={showThankYou}
-          onClose={() => setShowThankYou(false)}
-          surveyTitle={survey.title}
-          shareUrl={shareUrl}
-        />
       </div>
     </>
   )

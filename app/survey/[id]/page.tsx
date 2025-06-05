@@ -1,150 +1,141 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import { supabase } from "@/lib/supabase/client"
+import { supabaseServer } from "@/lib/supabase/server"
+import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Share, Copy, ExternalLink, Loader2 } from "lucide-react"
-import { toast } from "sonner"
-import Head from "next/head"
+import { Share, ExternalLink } from "lucide-react"
+import { ShareButton } from "@/components/survey/share-button"
 
-export default function SurveyPage() {
-  const { id } = useParams()
-  const [survey, setSurvey] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+interface SurveyData {
+  id: string
+  title: string
+  created_at: string
+  expires_at: string
+  questions: any[]
+  type: string
+}
 
-  useEffect(() => {
-    const fetchSurvey = async () => {
-      try {
-        console.log("Fetching survey with ID:", id)
+export default async function SurveyPage({ params }: { params: { id: string } }) {
+  const surveyId = params.id
+  let survey: SurveyData | null = null
 
-        const { data, error } = await supabase.from("demos").select("*").eq("id", id).single()
+  try {
+    console.log("Fetching survey with ID:", surveyId)
 
-        if (error) {
-          console.error("Error fetching survey:", error)
-          setError("Survey not found")
-          return
-        }
+    // Query the surveys table instead of demos
+    const { data, error } = await supabaseServer
+      .from("surveys")
+      .select("id, title, created_at, expires_at, questions, type")
+      .eq("id", surveyId)
+      .single()
 
-        if (data) {
-          console.log("Survey fetched:", data)
-          setSurvey(data)
-        }
-      } catch (err) {
-        console.error("Error:", err)
-        setError("Failed to load survey")
-      } finally {
-        setLoading(false)
-      }
+    if (error) {
+      console.error("Supabase fetch error:", error)
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-red-600">Survey not found</h2>
+            <p className="text-gray-600">The survey you're looking for doesn't exist or has been removed.</p>
+            <a href="/demo" className="text-blue-600 hover:underline mt-4 inline-block">
+              Create a new survey
+            </a>
+          </div>
+        </div>
+      )
     }
 
-    if (id) {
-      fetchSurvey()
+    if (!data) {
+      console.error("No data returned for survey ID:", surveyId)
+      return notFound()
     }
-  }, [id])
 
-  const copyLink = async () => {
-    const link = `${window.location.origin}/respond/${id}`
-    try {
-      await navigator.clipboard.writeText(link)
-      toast.success("Link copied to clipboard!")
-    } catch (err) {
-      toast.error("Failed to copy link")
-    }
-  }
-
-  const shareToFarcaster = () => {
-    const text = `@audioform ${encodeURIComponent(survey.topic)}`
-    const url = `${window.location.origin}/respond/${id}`
-    const shareLink = `https://warpcast.com/~/compose?text=${text}%20${encodeURIComponent(url)}`
-    window.open(shareLink, "_blank")
-  }
-
-  if (loading) {
+    survey = data
+    console.log("Survey data:", survey)
+  } catch (err) {
+    console.error("Unexpected server error:", err)
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="animate-spin h-12 w-12 mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading survey...</p>
+          <h2 className="text-xl font-semibold text-red-600">Error loading survey</h2>
+          <p className="text-gray-600">Please try again later.</p>
+          <a href="/demo" className="text-blue-600 hover:underline mt-4 inline-block">
+            Return to surveys
+          </a>
         </div>
       </div>
     )
   }
 
-  if (error || !survey) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-2">Error</h2>
-          <p className="text-gray-600">{error || "Survey not found"}</p>
-        </div>
-      </div>
-    )
-  }
+  // Check if survey has expired
+  const isExpired = survey.expires_at && new Date(survey.expires_at) < new Date()
+  const hoursLeft = survey.expires_at
+    ? Math.max(0, Math.floor((new Date(survey.expires_at).getTime() - Date.now()) / (1000 * 60 * 60)))
+    : 0
+
+  const shareText = `@audioform "${survey.title}" (Reply in voice 👇)`
+  const responseUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/respond/${survey.id}`
+  const farcasterUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(`${shareText} ${responseUrl}`)}`
 
   return (
-    <>
-      <Head>
-        <title>{survey.topic} | Voice Survey</title>
-        <meta name="description" content={`Voice your thoughts: ${survey.topic}`} />
-        <meta property="og:title" content={survey.topic} />
-        <meta property="og:description" content="Voice your thoughts in seconds" />
-        <meta property="og:url" content={`${process.env.NEXT_PUBLIC_SITE_URL}/respond/${id}`} />
-      </Head>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
+      <div className="max-w-2xl mx-auto py-12 px-4">
+        <Card className="bg-white rounded-xl shadow-lg border-0">
+          <CardContent className="p-6 sm:p-8 space-y-6">
+            <div className="text-center">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">{survey.title}</h1>
+              <p className="text-gray-600 mb-6">
+                Share this survey on Farcaster to get voice replies in-app, or copy the link to share anywhere.
+              </p>
+            </div>
 
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
-        <div className="max-w-2xl mx-auto py-12 px-4">
-          <Card className="bg-white rounded-xl shadow-lg border-0">
-            <CardContent className="p-6 sm:p-8 space-y-6">
-              <div className="text-center">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">{survey.topic}</h1>
-                <p className="text-gray-600 mb-6">
-                  Share this survey on Farcaster to get voice replies in-app, or copy the link to share anywhere.
-                </p>
+            {isExpired ? (
+              <div className="p-4 bg-red-50 rounded-lg text-center">
+                <p className="text-red-600 font-medium">This survey has expired</p>
+                <p className="text-gray-600 text-sm mt-2">Demo surveys are only available for 24 hours</p>
+                <a href="/demo" className="text-blue-600 hover:underline mt-4 inline-block">
+                  Create a new survey
+                </a>
               </div>
-
+            ) : (
               <div className="space-y-4">
-                <Button
-                  onClick={shareToFarcaster}
-                  className="w-full h-12 bg-purple-600 hover:bg-purple-700 flex items-center justify-center gap-2"
-                >
-                  <Share className="w-4 h-4" />
-                  Share to Farcaster
-                </Button>
+                <a href={farcasterUrl} target="_blank" rel="noopener noreferrer" className="w-full">
+                  <Button className="w-full h-12 bg-purple-600 hover:bg-purple-700 flex items-center justify-center gap-2">
+                    <Share className="w-4 h-4" />
+                    Share on Farcaster
+                  </Button>
+                </a>
 
-                <Button
-                  onClick={copyLink}
-                  variant="outline"
-                  className="w-full h-12 flex items-center justify-center gap-2"
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy Survey Link
-                </Button>
+                <ShareButton surveyId={survey.id} surveyTitle={survey.title} />
 
                 <div className="pt-4 border-t">
                   <p className="text-sm text-gray-500 text-center mb-3">Direct response link:</p>
                   <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                    <code className="flex-1 text-sm text-gray-700 truncate">
-                      {`${window.location.origin}/respond/${id}`}
-                    </code>
-                    <Button size="sm" variant="ghost" onClick={() => window.open(`/respond/${id}`, "_blank")}>
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
+                    <input
+                      type="text"
+                      readOnly
+                      value={responseUrl}
+                      className="flex-1 bg-transparent text-sm text-gray-700 outline-none"
+                    />
+                    <a href={`/respond/${survey.id}`} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="ghost">
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </a>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="text-center pt-4 border-t">
-                <p className="text-xs text-gray-500">
-                  Survey expires: {new Date(survey.expires_at).toLocaleDateString()}
+            <div className="text-center pt-4 border-t">
+              {!isExpired && survey.expires_at && (
+                <p className="text-sm text-amber-600 font-medium mb-1">
+                  Demo expires in {hoursLeft} {hoursLeft === 1 ? "hour" : "hours"}
                 </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              )}
+              <p className="text-xs text-gray-500">Created: {new Date(survey.created_at).toLocaleDateString()}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-    </>
+    </div>
   )
 }

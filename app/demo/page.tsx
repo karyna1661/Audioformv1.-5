@@ -1,84 +1,136 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import type React from "react"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase/client"
+import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, Send, Sparkles } from "lucide-react"
-import { supabase } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import { createSurvey } from "@/lib/actions/createSurvey"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Loader2, Plus, Trash2, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import Head from "next/head"
 
-export default function DemoPage() {
-  const [topic, setTopic] = useState("")
-  const [creating, setCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+const surveySchema = z.object({
+  title: z.string().min(1, "Title is required").max(200, "Title is too long"),
+  questions: z.array(z.string().min(1, "Question cannot be empty")).min(1, "At least one question is required"),
+  type: z.enum(["demo", "standard"]).default("demo"),
+})
+
+export default function CreateSurveyPage() {
   const router = useRouter()
+  const [title, setTitle] = useState("")
+  const [questions, setQuestions] = useState([""])
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const { data, error } = await supabase.auth.getUser()
-        if (error) {
-          console.error("Auth error:", error)
-          // For demo purposes, we'll allow anonymous users
-          setUser(null)
-        } else {
-          setUser(data.user)
-        }
-      } catch (err) {
-        console.error("Error fetching user:", err)
-        setUser(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchProfile()
-  }, [])
+  const handleQuestionChange = (index: number, value: string) => {
+    const updatedQuestions = [...questions]
+    updatedQuestions[index] = value
+    setQuestions(updatedQuestions)
+  }
 
-  const handleCreateSurvey = async () => {
-    if (!topic.trim()) {
-      toast.error("Please enter a topic for your survey")
-      return
-    }
+  const addQuestion = () => {
+    setQuestions([...questions, ""])
+  }
 
-    setCreating(true)
-    setError(null)
-
-    try {
-      console.log("Creating survey with topic:", topic)
-      const { demoId } = await createSurvey(topic)
-      console.log("Survey created with ID:", demoId)
-
-      toast.success("Survey created successfully!")
-      router.push(`/survey/${demoId}`)
-    } catch (err: any) {
-      console.error("Survey creation failed:", err)
-      const errorMessage = err.message || "Failed to create survey. Please try again."
-      setError(errorMessage)
-      toast.error(errorMessage)
-    } finally {
-      setCreating(false)
+  const removeQuestion = (index: number) => {
+    if (questions.length > 1) {
+      const updatedQuestions = questions.filter((_, i) => i !== index)
+      setQuestions(updatedQuestions)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+
+    try {
+      // Validate input
+      const validation = surveySchema.safeParse({ title, questions: questions.filter((q) => q.trim()) })
+      if (!validation.success) {
+        setError(validation.error.errors[0].message)
+        return
+      }
+
+      // Get user (optional for demo)
+      const { data: userData } = await supabase.auth.getUser()
+      const userId = userData?.user?.id ?? null
+
+      // Calculate expiry date (24 hours from now)
+      const expiresAt = new Date()
+      expiresAt.setHours(expiresAt.getHours() + 24)
+
+      // Format questions for database
+      const formattedQuestions = questions
+        .filter((q) => q.trim())
+        .map((question, index) => ({
+          id: (index + 1).toString(),
+          text: question.trim(),
+        }))
+
+      // Create survey
+      const { data, error: insertError } = await supabase
+        .from("surveys")
+        .insert([
+          {
+            title: title.trim(),
+            questions: formattedQuestions,
+            type: "demo",
+            user_id: userId,
+            expires_at: expiresAt.toISOString(),
+            is_active: true,
+          },
+        ])
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error("Database error:", insertError)
+        setError("Failed to create survey. Please try again.")
+        return
+      }
+
+      if (!data) {
+        setError("Failed to create survey. No data returned.")
+        return
+      }
+
+      // Create demo session
+      try {
+        await supabase.from("demo_sessions").insert([
+          {
+            survey_id: data.id,
+            user_id: userId,
+            started_at: new Date().toISOString(),
+            expires_at: expiresAt.toISOString(),
+            notified: false,
+          },
+        ])
+      } catch (sessionError) {
+        console.error("Error creating demo session:", sessionError)
+        // Continue anyway since survey was created
+      }
+
+      toast.success("Survey created successfully!")
+      router.push(`/survey/${data.id}`)
+    } catch (err) {
+      console.error("Unexpected error:", err)
+      setError("An unexpected error occurred. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <>
       <Head>
-        <title>Create Voice Survey | Audioform Demo</title>
-        <meta name="description" content="Create engaging voice surveys in seconds" />
+        <title>Create Demo Survey | Audioform</title>
+        <meta name="description" content="Create a voice survey demo in seconds" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
 
@@ -101,86 +153,114 @@ export default function DemoPage() {
           </div>
 
           {/* Main Form */}
-          <div className="max-w-xl mx-auto">
-            <Card className="rounded-2xl shadow-xl bg-white/95 backdrop-blur-sm border-0">
-              <CardContent className="p-6 sm:p-8 space-y-6">
-                <div className="text-center">
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">What's Your Question?</h2>
-                  <p className="text-sm sm:text-base text-gray-600">Ask anything and get authentic voice responses</p>
-                </div>
+          <div className="max-w-2xl mx-auto">
+            <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+              <CardHeader className="pb-4 sm:pb-6">
+                <CardTitle className="text-xl sm:text-2xl text-center">Survey Details</CardTitle>
+              </CardHeader>
 
-                <div className="space-y-4">
-                  <Input
-                    type="text"
-                    placeholder="e.g., What's your favorite productivity tip?"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    className="h-12 sm:h-14 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter" && !creating && topic.trim()) {
-                        handleCreateSurvey()
-                      }
-                    }}
-                  />
+              <CardContent className="p-4 sm:p-6">
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
 
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Survey Title */}
+                  <div className="space-y-2">
+                    <Label htmlFor="title" className="text-sm sm:text-base font-medium">
+                      Survey Title *
+                    </Label>
+                    <Input
+                      id="title"
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g., What's your favorite productivity tip?"
+                      className="h-11 sm:h-12 text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+
+                  {/* Questions */}
+                  <div className="space-y-2">
+                    <Label className="text-sm sm:text-base font-medium">Questions *</Label>
+                    <div className="space-y-3">
+                      {questions.map((question, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <Input
+                              type="text"
+                              value={question}
+                              onChange={(e) => handleQuestionChange(index, e.target.value)}
+                              placeholder={`Question ${index + 1}`}
+                              className="h-11 sm:h-12 text-sm sm:text-base"
+                              required
+                            />
+                          </div>
+                          {questions.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeQuestion(index)}
+                              className="h-11 sm:h-12 px-3"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={addQuestion}
+                      className="mt-2 text-blue-600 hover:text-blue-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Question
+                    </Button>
+                  </div>
+
+                  {/* Submit Button */}
                   <Button
-                    className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 flex items-center justify-center gap-2"
-                    onClick={handleCreateSurvey}
-                    disabled={creating || !topic.trim()}
+                    type="submit"
+                    disabled={loading || !title.trim() || questions.every((q) => !q.trim())}
+                    className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   >
-                    {creating ? (
+                    {loading ? (
                       <>
-                        <Loader2 className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
+                        <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
                         Creating Survey...
                       </>
                     ) : (
-                      <>
-                        <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-                        Create Voice Survey
-                      </>
+                      "Create Voice Survey"
                     )}
                   </Button>
-
-                  {error && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-red-600 text-sm">{error}</p>
-                    </div>
-                  )}
-                </div>
-
-                {!user && (
-                  <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-700">
-                      <strong>Demo Mode:</strong> Your survey will be available for 24 hours.
-                      <br />
-                      <a href="/login" className="underline hover:no-underline">
-                        Sign up
-                      </a>{" "}
-                      for permanent surveys.
-                    </p>
-                  </div>
-                )}
+                </form>
               </CardContent>
             </Card>
 
-            {/* Features */}
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-xl">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                  <Send className="h-5 w-5 text-blue-600" />
+            {/* Info Card */}
+            <Card className="mt-6 bg-blue-50/80 backdrop-blur-sm border-blue-200">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="font-semibold text-blue-900 mb-1">Demo Survey Features</h3>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• Available for 24 hours</li>
+                      <li>• Voice responses from participants</li>
+                      <li>• Easy sharing on social media</li>
+                      <li>• No account required for respondents</li>
+                    </ul>
+                  </div>
                 </div>
-                <h3 className="font-semibold mb-2 text-sm">Easy Sharing</h3>
-                <p className="text-xs text-gray-600">Share on Farcaster and social media</p>
-              </div>
-
-              <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-xl">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                  <Sparkles className="h-5 w-5 text-purple-600" />
-                </div>
-                <h3 className="font-semibold mb-2 text-sm">Voice Responses</h3>
-                <p className="text-xs text-gray-600">Authentic audio feedback in seconds</p>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
