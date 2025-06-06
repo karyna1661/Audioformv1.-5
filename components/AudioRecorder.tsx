@@ -4,7 +4,6 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, Square, Play, Pause, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import { DynamicWaveform } from "./audio/dynamic-waveform"
 
 interface AudioRecorderProps {
   onSubmit: (audioBlob: Blob) => void
@@ -127,25 +126,26 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
               Stop Recording
             </Button>
 
+            {/* Three-dot recording indicator */}
             <div className="flex items-center justify-center space-x-2">
               <div className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse"></div>
-              <span className="text-indigo-600 font-medium">Recording in progress...</span>
+              <div
+                className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse"
+                style={{ animationDelay: "0.2s" }}
+              ></div>
+              <div
+                className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse"
+                style={{ animationDelay: "0.4s" }}
+              ></div>
+              <span className="text-indigo-600 font-medium ml-3">Recording in progress...</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Dynamic Waveform */}
-      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 shadow-sm">
-        <DynamicWaveform
-          audioUrl={audioUrl || undefined}
-          isPlaying={isPlaying}
-          isRecording={isRecording}
-          className="mb-4"
-        />
-
-        {/* Audio Controls */}
-        {audioUrl && (
+      {/* Audio Playback Controls (No Waveform) */}
+      {audioUrl && (
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 shadow-sm">
           <div className="space-y-4">
             <div className="flex items-center justify-center space-x-4">
               <Button
@@ -180,12 +180,8 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
 
             <p className="text-xs text-center text-gray-600">Preview your recording before submitting</p>
           </div>
-        )}
-
-        {isRecording && (
-          <p className="text-xs text-center text-indigo-600 font-medium">Speak clearly into your microphone</p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Submit Button */}
       {audioBlob && (

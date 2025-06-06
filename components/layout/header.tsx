@@ -127,6 +127,7 @@ export function Header() {
               <DialogDescription className="mb-6">
                 We'll notify you at <span className="font-medium">{email}</span> when we launch.
               </DialogDescription>
+              <p className="text-xs text-gray-500">© 2025 Audioform. All rights reserved.</p>
               <Button onClick={() => setShowWaitlistModal(false)}>Close</Button>
             </div>
           )}
