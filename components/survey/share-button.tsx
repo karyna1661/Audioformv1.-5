@@ -24,7 +24,9 @@ export function ShareButton({
 }: ShareButtonProps) {
   const [showQR, setShowQR] = useState(false)
 
-  const shareUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/respond/${surveyId}`
+  // Ensure proper URL construction without spaces
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://voxera.vercel.app"
+  const shareUrl = `${baseUrl}/respond/${surveyId}`
 
   const handleCopyLink = async () => {
     try {

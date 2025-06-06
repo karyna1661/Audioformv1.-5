@@ -21,7 +21,6 @@ export default async function SurveyPage({ params }: { params: { id: string } })
   try {
     console.log("Fetching survey with ID:", surveyId)
 
-    // Query the surveys table instead of demos
     const { data, error } = await supabaseServer
       .from("surveys")
       .select("id, title, created_at, expires_at, questions, type")
@@ -71,8 +70,10 @@ export default async function SurveyPage({ params }: { params: { id: string } })
     ? Math.max(0, Math.floor((new Date(survey.expires_at).getTime() - Date.now()) / (1000 * 60 * 60)))
     : 0
 
+  // Proper URL construction without spaces
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://voxera.vercel.app"
+  const responseUrl = `${baseUrl}/respond/${survey.id}`
   const shareText = `@audioform "${survey.title}" (Reply in voice 👇)`
-  const responseUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/respond/${survey.id}`
   const farcasterUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(`${shareText} ${responseUrl}`)}`
 
   return (
@@ -104,7 +105,7 @@ export default async function SurveyPage({ params }: { params: { id: string } })
                   </Button>
                 </a>
 
-                <ShareButton surveyId={survey.id} surveyTitle={survey.title} />
+                <ShareButton surveyId={survey.id} surveyTitle={survey.title} className="w-full" />
 
                 <div className="pt-4 border-t">
                   <p className="text-sm text-gray-500 text-center mb-3">Direct response link:</p>
