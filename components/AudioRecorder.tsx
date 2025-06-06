@@ -4,6 +4,7 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, Square, Play, Pause, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { DynamicWaveform } from "./audio/dynamic-waveform"
 
 interface AudioRecorderProps {
   onSubmit: (audioBlob: Blob) => void
@@ -97,96 +98,111 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 max-w-md mx-auto">
       {/* Recording Controls */}
       <div className="text-center space-y-4">
         {!isRecording && !audioBlob && (
-          <Button
-            onClick={startRecording}
-            disabled={isLoading}
-            className="w-full h-16 text-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
-            size="lg"
-          >
-            <Mic className="mr-2 h-6 w-6" />
-            Start Recording
-          </Button>
+          <div className="space-y-4">
+            <Button
+              onClick={startRecording}
+              disabled={isLoading}
+              className="w-full h-16 text-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              size="lg"
+            >
+              <Mic className="mr-2 h-6 w-6" />
+              Start Recording
+            </Button>
+            <p className="text-sm text-gray-600">Tap to start recording your response</p>
+          </div>
         )}
 
         {isRecording && (
-          <Button
-            onClick={stopRecording}
-            className="w-full h-16 text-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white animate-pulse"
-            size="lg"
-          >
-            <Square className="mr-2 h-6 w-6" />
-            Stop Recording
-          </Button>
-        )}
+          <div className="space-y-4">
+            <Button
+              onClick={stopRecording}
+              className="w-full h-16 text-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg animate-pulse"
+              size="lg"
+            >
+              <Square className="mr-2 h-6 w-6" />
+              Stop Recording
+            </Button>
 
-        {isRecording && (
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse"></div>
-            <span className="text-indigo-600 font-medium">Recording in progress...</span>
+            <div className="flex items-center justify-center space-x-2">
+              <div className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse"></div>
+              <span className="text-indigo-600 font-medium">Recording in progress...</span>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Audio Playback */}
-      {audioUrl && (
-        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-center space-x-4">
-            <Button
-              onClick={isPlaying ? pauseAudio : playAudio}
-              variant="outline"
-              size="sm"
-              className="border-indigo-200 hover:bg-indigo-50 text-indigo-600"
-            >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              {isPlaying ? "Pause" : "Play"}
-            </Button>
+      {/* Dynamic Waveform */}
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 shadow-sm">
+        <DynamicWaveform
+          audioUrl={audioUrl || undefined}
+          isPlaying={isPlaying}
+          isRecording={isRecording}
+          className="mb-4"
+        />
 
-            <Button
-              onClick={resetRecording}
-              variant="outline"
-              size="sm"
-              disabled={isLoading}
-              className="border-indigo-200 hover:bg-indigo-50 text-indigo-600"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Record Again
-            </Button>
-          </div>
+        {/* Audio Controls */}
+        {audioUrl && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center space-x-4">
+              <Button
+                onClick={isPlaying ? pauseAudio : playAudio}
+                variant="outline"
+                size="sm"
+                className="border-indigo-200 hover:bg-indigo-50 text-indigo-600 shadow-sm"
+              >
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {isPlaying ? "Pause" : "Play"}
+              </Button>
 
-          <audio ref={audioRef} src={audioUrl} onEnded={handleAudioEnded} className="hidden" />
-
-          {/* Audio Waveform Visualization */}
-          <div className="h-12 bg-indigo-50 rounded-md flex items-center justify-center p-2 my-2">
-            <div className="flex items-end space-x-1 h-full w-full">
-              {Array.from({ length: 40 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-gradient-to-t from-indigo-400 to-purple-500 rounded-full w-1.5"
-                  style={{
-                    height: `${Math.max(15, Math.min(100, 30 + Math.sin(i * 0.5) * 70))}%`,
-                  }}
-                ></div>
-              ))}
+              <Button
+                onClick={resetRecording}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                className="border-indigo-200 hover:bg-indigo-50 text-indigo-600 shadow-sm"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Record Again
+              </Button>
             </div>
-          </div>
 
-          <p className="text-xs text-center text-gray-600">Preview your recording before submitting</p>
-        </div>
-      )}
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              onEnded={handleAudioEnded}
+              className="hidden"
+              crossOrigin="anonymous"
+            />
+
+            <p className="text-xs text-center text-gray-600">Preview your recording before submitting</p>
+          </div>
+        )}
+
+        {isRecording && (
+          <p className="text-xs text-center text-indigo-600 font-medium">Speak clearly into your microphone</p>
+        )}
+      </div>
 
       {/* Submit Button */}
       {audioBlob && (
         <Button
           onClick={handleSubmit}
           disabled={isLoading}
-          className="w-full h-12 text-base font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+          className="w-full h-12 text-base font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
           size="lg"
         >
-          {isLoading ? "Submitting..." : "Submit Response"}
+          {isLoading ? (
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Submitting...</span>
+            </div>
+          ) : (
+            "Submit Response"
+          )}
         </Button>
       )}
     </div>
