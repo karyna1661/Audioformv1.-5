@@ -6,9 +6,17 @@
  * Get the base URL from environment variables with proper formatting
  */
 export function getBaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_SITE_URL || "https://voxera.vercel.app"
-  // Remove trailing slash if present
-  return url.replace(/\/$/, "")
+  let url = process.env.NEXT_PUBLIC_SITE_URL || "https://voxera.vercel.app"
+
+  // Remove any whitespace and trailing slash
+  url = url.trim().replace(/\/$/, "")
+
+  // Ensure it starts with https:// if no protocol is specified
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `https://${url}`
+  }
+
+  return url
 }
 
 /**
@@ -16,7 +24,8 @@ export function getBaseUrl(): string {
  */
 export function getSurveyResponseUrl(surveyId: string): string {
   const baseUrl = getBaseUrl()
-  return `${baseUrl}/respond/${surveyId}`
+  const cleanSurveyId = surveyId.trim()
+  return `${baseUrl}/respond/${cleanSurveyId}`
 }
 
 /**
@@ -24,15 +33,18 @@ export function getSurveyResponseUrl(surveyId: string): string {
  */
 export function getSurveySharingUrl(surveyId: string): string {
   const baseUrl = getBaseUrl()
-  return `${baseUrl}/survey/${surveyId}`
+  const cleanSurveyId = surveyId.trim()
+  return `${baseUrl}/survey/${cleanSurveyId}`
 }
 
 /**
  * Construct a Farcaster sharing URL
  */
 export function getFarcasterShareUrl(text: string, url: string): string {
-  const encodedText = encodeURIComponent(text)
-  const encodedUrl = encodeURIComponent(url)
+  const cleanText = text.trim()
+  const cleanUrl = url.trim()
+  const encodedText = encodeURIComponent(cleanText)
+  const encodedUrl = encodeURIComponent(cleanUrl)
   return `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodedUrl}`
 }
 

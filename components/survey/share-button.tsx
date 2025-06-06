@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Copy, Share2, ExternalLink, QrCode } from "lucide-react"
 import { toast } from "sonner"
 import { QRCodeModal } from "./qr-code-modal"
+import { getSurveyResponseUrl, getFarcasterShareUrl } from "@/utils/url-utils"
 
 interface ShareButtonProps {
   surveyId: string
@@ -24,9 +25,8 @@ export function ShareButton({
 }: ShareButtonProps) {
   const [showQR, setShowQR] = useState(false)
 
-  // Ensure proper URL construction without spaces
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://voxera.vercel.app"
-  const shareUrl = `${baseUrl}/respond/${surveyId}`
+  // Use utility function for consistent URL construction
+  const shareUrl = getSurveyResponseUrl(surveyId)
 
   const handleCopyLink = async () => {
     try {
@@ -38,10 +38,8 @@ export function ShareButton({
   }
 
   const handleShareOnFarcaster = () => {
-    const text = encodeURIComponent(`Voice your thoughts on "${surveyTitle}" 🎙️`)
-    const url = encodeURIComponent(shareUrl)
-    const farcasterUrl = `https://warpcast.com/~/compose?text=${text}&embeds[]=${url}`
-
+    const text = `Voice your thoughts on "${surveyTitle}" 🎙️`
+    const farcasterUrl = getFarcasterShareUrl(text, shareUrl)
     window.open(farcasterUrl, "_blank", "noopener,noreferrer")
   }
 

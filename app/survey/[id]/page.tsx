@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Share, ExternalLink } from "lucide-react"
 import { ShareButton } from "@/components/survey/share-button"
+import { getSurveyResponseUrl, getFarcasterShareUrl } from "@/utils/url-utils"
 
 interface SurveyData {
   id: string
@@ -15,7 +16,7 @@ interface SurveyData {
 }
 
 export default async function SurveyPage({ params }: { params: { id: string } }) {
-  const surveyId = params.id
+  const surveyId = params.id.trim() // Clean the survey ID
   let survey: SurveyData | null = null
 
   try {
@@ -70,11 +71,12 @@ export default async function SurveyPage({ params }: { params: { id: string } })
     ? Math.max(0, Math.floor((new Date(survey.expires_at).getTime() - Date.now()) / (1000 * 60 * 60)))
     : 0
 
-  // Proper URL construction without spaces
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://voxera.vercel.app"
-  const responseUrl = `${baseUrl}/respond/${survey.id}`
+  // Use utility functions for URL construction
+  const responseUrl = getSurveyResponseUrl(survey.id)
   const shareText = `@audioform "${survey.title}" (Reply in voice 👇)`
-  const farcasterUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(`${shareText} ${responseUrl}`)}`
+  const farcasterUrl = getFarcasterShareUrl(shareText, responseUrl)
+
+  console.log("Generated response URL:", responseUrl) // Debug log
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
@@ -116,7 +118,7 @@ export default async function SurveyPage({ params }: { params: { id: string } })
                       value={responseUrl}
                       className="flex-1 bg-transparent text-sm text-gray-700 outline-none"
                     />
-                    <a href={`/respond/${survey.id}`} target="_blank" rel="noopener noreferrer">
+                    <a href={responseUrl} target="_blank" rel="noopener noreferrer">
                       <Button size="sm" variant="ghost">
                         <ExternalLink className="w-4 h-4" />
                       </Button>
