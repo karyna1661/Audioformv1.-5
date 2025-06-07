@@ -1,32 +1,38 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Mic, Square, Play, Pause, Trash2 } from "lucide-react"
-import { toast } from "sonner"
+import { Mic, Square, Play, Pause, RotateCcw } from "lucide-react"
 
 interface AudioRecorderProps {
   onSubmit: (audioBlob: Blob) => void
-  isLoading: boolean
+  isLoading?: boolean
+  disabled?: boolean
 }
 
-export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
+export function AudioRecorder({ onSubmit, isLoading = false, disabled = false }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
+  }, [])
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
-      })
-
+      const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
 
@@ -39,19 +45,19 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" })
         setAudioBlob(blob)
-        const url = URL.createObjectURL(blob)
-        setAudioUrl(url)
-
-        // Stop all tracks to release microphone
         stream.getTracks().forEach((track) => track.stop())
       }
 
       mediaRecorder.start()
       setIsRecording(true)
-      toast.success("Recording started")
+      setRecordingTime(0)
+
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1)
+      }, 1000)
     } catch (error) {
       console.error("Error starting recording:", error)
-      toast.error("Failed to start recording. Please check microphone permissions.")
     }
   }
 
@@ -59,141 +65,148 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
-      toast.success("Recording stopped")
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
     }
   }
 
   const playAudio = () => {
-    if (audioUrl && audioRef.current) {
-      audioRef.current.play()
+    if (audioBlob && !isPlaying) {
+      const audioUrl = URL.createObjectURL(audioBlob)
+      const audio = new Audio(audioUrl)
+      audioRef.current = audio
+
+      audio.onended = () => {
+        setIsPlaying(false)
+        URL.revokeObjectURL(audioUrl)
+      }
+
+      audio.play()
       setIsPlaying(true)
     }
   }
 
   const pauseAudio = () => {
-    if (audioRef.current) {
+    if (audioRef.current && isPlaying) {
       audioRef.current.pause()
       setIsPlaying(false)
     }
   }
 
-  const handleAudioEnded = () => {
+  const resetRecording = () => {
+    setAudioBlob(null)
     setIsPlaying(false)
+    setRecordingTime(0)
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
   }
 
   const handleSubmit = () => {
-    if (audioBlob) {
+    if (audioBlob && !isLoading) {
       onSubmit(audioBlob)
     }
   }
 
-  const resetRecording = () => {
-    setAudioBlob(null)
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl)
-      setAudioUrl(null)
-    }
-    setIsPlaying(false)
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
   return (
-    <div className="space-y-6 max-w-md mx-auto">
-      {/* Recording Controls */}
-      <div className="text-center space-y-4">
-        {!isRecording && !audioBlob && (
-          <div className="space-y-4">
-            <Button
-              onClick={startRecording}
-              disabled={isLoading}
-              className="w-full h-16 text-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-              size="lg"
-            >
-              <Mic className="mr-2 h-6 w-6" />
-              Start Recording
-            </Button>
-            <p className="text-sm text-gray-600">Tap to start recording your response</p>
-          </div>
-        )}
+    <div className="space-y-6">
+      {/* Recording Interface */}
+      <div className="flex flex-col items-center space-y-4">
+        {/* Recording Button */}
+        <div className="relative">
+          <Button
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={disabled || isLoading}
+            size="lg"
+            className={`w-20 h-20 rounded-full transition-all duration-200 ${
+              isRecording
+                ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                : "bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+            }`}
+          >
+            {isRecording ? <Square className="w-8 h-8 text-white" /> : <Mic className="w-8 h-8 text-white" />}
+          </Button>
 
-        {isRecording && (
-          <div className="space-y-4">
-            <Button
-              onClick={stopRecording}
-              className="w-full h-16 text-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg animate-pulse"
-              size="lg"
-            >
-              <Square className="mr-2 h-6 w-6" />
-              Stop Recording
-            </Button>
-
-            {/* Three-dot recording indicator */}
-            <div className="flex items-center justify-center space-x-2">
-              <div className="w-3 h-3 bg-indigo-500 rounded-full animate-ping"></div>
-              <div className="w-3 h-3 bg-indigo-500 rounded-full animate-ping" style={{ animationDelay: "0.2s" }}></div>
-              <div className="w-3 h-3 bg-indigo-500 rounded-full animate-ping" style={{ animationDelay: "0.4s" }}></div>
-              <span className="text-indigo-600 font-medium ml-3">Recording in progress...</span>
+          {/* Recording indicator dots */}
+          {isRecording && (
+            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-1">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "0s" }}></div>
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Recording Status */}
+        <div className="text-center">
+          {isRecording ? (
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-red-600">Recording...</p>
+              <p className="text-lg font-mono text-gray-900">{formatTime(recordingTime)}</p>
+            </div>
+          ) : audioBlob ? (
+            <p className="text-sm font-medium text-green-600">Recording complete</p>
+          ) : (
+            <p className="text-sm text-gray-600">Tap to start recording</p>
+          )}
+        </div>
       </div>
 
-      {/* Audio Playback Controls (No Waveform) */}
-      {audioUrl && (
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100 shadow-sm">
-          <div className="space-y-4">
-            <div className="flex items-center justify-center space-x-4">
-              <Button
-                onClick={isPlaying ? pauseAudio : playAudio}
-                variant="outline"
-                size="sm"
-                className="border-indigo-200 hover:bg-indigo-50 text-indigo-600 shadow-sm"
-              >
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                {isPlaying ? "Pause" : "Play"}
-              </Button>
+      {/* Playback Controls */}
+      {audioBlob && !isRecording && (
+        <div className="flex justify-center space-x-3">
+          <Button
+            onClick={isPlaying ? pauseAudio : playAudio}
+            variant="outline"
+            size="sm"
+            disabled={disabled || isLoading}
+            className="flex items-center space-x-2"
+          >
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            <span>{isPlaying ? "Pause" : "Play"}</span>
+          </Button>
 
-              <Button
-                onClick={resetRecording}
-                variant="outline"
-                size="sm"
-                disabled={isLoading}
-                className="border-indigo-200 hover:bg-indigo-50 text-indigo-600 shadow-sm"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Record Again
-              </Button>
-            </div>
-
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              onEnded={handleAudioEnded}
-              className="hidden"
-              crossOrigin="anonymous"
-            />
-
-            <p className="text-xs text-center text-gray-600">Preview your recording before submitting</p>
-          </div>
+          <Button
+            onClick={resetRecording}
+            variant="outline"
+            size="sm"
+            disabled={disabled || isLoading}
+            className="flex items-center space-x-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>Record Again</span>
+          </Button>
         </div>
       )}
 
       {/* Submit Button */}
-      {audioBlob && (
-        <Button
-          onClick={handleSubmit}
-          disabled={isLoading}
-          className="w-full h-12 text-base font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-          size="lg"
-        >
-          {isLoading ? (
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Submitting...</span>
-            </div>
-          ) : (
-            "Submit Response"
-          )}
-        </Button>
+      {audioBlob && !isRecording && (
+        <div className="flex justify-center">
+          <Button
+            onClick={handleSubmit}
+            disabled={disabled || isLoading}
+            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 px-8 py-2"
+          >
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                Submitting...
+              </>
+            ) : (
+              "Submit Response"
+            )}
+          </Button>
+        </div>
       )}
     </div>
   )
