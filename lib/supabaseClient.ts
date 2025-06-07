@@ -32,7 +32,7 @@ export const supabaseServer: SupabaseClient<Database> = createSupabaseClient<Dat
   },
 )
 
-// Export supabase as a named export (REQUIRED by the error)
+// Export supabase as a named export (REQUIRED)
 export const supabase: SupabaseClient<Database> = supabaseBrowser
 
 // Export createClient as a named export for compatibility

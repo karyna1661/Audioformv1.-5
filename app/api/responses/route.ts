@@ -1,95 +1,56 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { surveyServiceServer } from "@/lib/services/survey-service"
-import { SurveyDatabaseError } from "@/lib/database/error-handler"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
+  console.log("Received response submission request")
+
   try {
     const formData = await request.formData()
-
+    const audio = formData.get("audio") as File
     const surveyId = formData.get("surveyId") as string
-    const questionId = formData.get("questionId") as string
-    const audioFile = formData.get("audio") as File
-    const email = formData.get("email") as string | null
+    const email = formData.get("email") as string
 
-    // Validate required fields
-    if (!surveyId || !questionId || !audioFile) {
-      return NextResponse.json(
-        {
-          error: "Missing required fields",
-          code: "INVALID_INPUT",
-          details: {
-            surveyId: !!surveyId,
-            questionId: !!questionId,
-            audioFile: !!audioFile,
-          },
-        },
-        { status: 400 },
-      )
+    if (!audio || !surveyId) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Convert File to Blob
-    const audioBlob = new Blob([await audioFile.arrayBuffer()], {
-      type: audioFile.type || "audio/webm",
+    console.log(`Processing response for survey ${surveyId}`)
+
+    // Initialize Supabase client with server credentials
+    const supabase = createClient()
+
+    // Upload audio file to Supabase Storage
+    const fileName = `${surveyId}/${Date.now()}_${Math.random().toString(36).substring(2, 15)}.webm`
+
+    const { data: uploadData, error: uploadError } = await supabase.storage.from("responses").upload(fileName, audio, {
+      contentType: "audio/webm",
     })
 
-    // Submit response using service
-    const response = await surveyServiceServer.submitResponse({
-      surveyId: surveyId.trim(),
-      questionId: questionId.trim(),
-      audioBlob,
-      email: email?.trim() || undefined,
-    })
+    if (uploadError) {
+      console.error("Error uploading audio:", uploadError)
+      return NextResponse.json({ error: "Failed to upload audio" }, { status: 500 })
+    }
 
-    return NextResponse.json({
-      success: true,
-      responseId: response.id,
-      message: "Response submitted successfully",
-    })
+    // Save response record in database
+    const { data: responseData, error: responseError } = await supabase
+      .from("responses")
+      .insert({
+        survey_id: surveyId,
+        audio_path: uploadData.path,
+        email: email || null,
+      })
+      .select()
+      .single()
+
+    if (responseError) {
+      console.error("Error saving response:", responseError)
+      return NextResponse.json({ error: "Failed to save response" }, { status: 500 })
+    }
+
+    console.log("Response submitted successfully")
+    return NextResponse.json({ success: true, data: responseData })
   } catch (error) {
-    console.error("Error in response submission API:", error)
-
-    if (error instanceof SurveyDatabaseError) {
-      const statusCode = getStatusCodeForError(error.code)
-
-      return NextResponse.json(
-        {
-          error: error.message,
-          code: error.code,
-          hint: error.hint,
-          details: error.details,
-        },
-        { status: statusCode },
-      )
-    }
-
-    // Generic error response
-    return NextResponse.json(
-      {
-        error: "An unexpected error occurred while submitting your response",
-        code: "INTERNAL_ERROR",
-        hint: "Please try again or contact support if the issue persists",
-      },
-      { status: 500 },
-    )
-  }
-}
-
-function getStatusCodeForError(errorCode: string): number {
-  switch (errorCode) {
-    case "NOT_FOUND":
-    case "QUESTION_NOT_FOUND":
-      return 404
-    case "INVALID_INPUT":
-    case "INVALID_SURVEY_ID":
-      return 400
-    case "SURVEY_INACTIVE":
-    case "SURVEY_EXPIRED":
-      return 410 // Gone
-    case "DUPLICATE_RESPONSE":
-      return 409 // Conflict
-    case "UPLOAD_FAILED":
-      return 507 // Insufficient Storage
-    default:
-      return 500
+    console.error("Unexpected error:", error)
+    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
   }
 }

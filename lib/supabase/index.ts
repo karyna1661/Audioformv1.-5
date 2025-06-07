@@ -1,10 +1,16 @@
-// Re-export everything from the main client modules
-export * from "./client"
-export * from "./server"
+// Re-export all client-side functionality
+export {
+  supabase,
+  createClient as createBrowserClient,
+  createBrowserSupabaseClient,
+} from "./client"
 
-// Re-export from the main supabaseClient module
-export * from "../supabaseClient"
+// Re-export all server-side functionality
+export {
+  supabaseServer,
+  createClient as createServerClient,
+  createAdminClient,
+} from "./server"
 
-// Ensure backward compatibility
-import { supabase as mainSupabase } from "../supabaseClient"
-export { mainSupabase as supabase }
+// Export type definitions
+export type { Database } from "@/types/database.types"
