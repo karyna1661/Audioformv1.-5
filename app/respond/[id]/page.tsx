@@ -1,59 +1,53 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { prisma } from "@/lib/db"
-import { notFound } from "next/navigation"
-import { Footer } from "@/components/layout/footer"
+"use client"
 
-interface Props {
-  params: {
-    id: string
+import { useParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+
+export default function RespondPage() {
+  const { id } = useParams()
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const supabase = createClient()
+
+      try {
+        const { data, error } = await supabase.from("responses").select("*").eq("id", id).single()
+
+        if (error) {
+          setError(error)
+        } else {
+          setData(data)
+        }
+      } catch (error: any) {
+        setError(error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [id])
+
+  if (loading) {
+    return <div>Loading...</div>
   }
-}
 
-const RespondPage = async ({ params: { id } }: Props) => {
-  const feedbackRequest = await prisma.feedbackRequest.findUnique({
-    where: {
-      id,
-    },
-  })
+  if (error) {
+    return <div>Error: {error.message}</div>
+  }
 
-  if (!feedbackRequest) {
-    notFound()
+  if (!data) {
+    return <div>No data found for ID: {id}</div>
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <main className="flex-grow flex items-center justify-center p-4">
-        <Card className="w-[450px]">
-          <CardHeader>
-            <CardTitle>Respond to Feedback Request</CardTitle>
-            <CardDescription>You are responding to a feedback request.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form>
-              <div className="grid w-full items-center gap-4">
-                <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="name">Your Name</Label>
-                  <Input id="name" placeholder="Your Name" />
-                </div>
-                <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="message">Your Feedback</Label>
-                  <Input id="message" placeholder="Your Feedback" />
-                </div>
-              </div>
-            </form>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline">Cancel</Button>
-            <Button>Submit</Button>
-          </CardFooter>
-        </Card>
-      </main>
-      <Footer />
+    <div>
+      <h1>Response ID: {id}</h1>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
     </div>
   )
 }
-
-export default RespondPage

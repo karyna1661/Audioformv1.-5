@@ -4,8 +4,8 @@ import "./globals.css"
 import { Toaster } from "sonner"
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
+  title: "Voxera",
+  description: "Voice-first feedback powered by Audioform.",
   generator: "v0.dev",
 }
 

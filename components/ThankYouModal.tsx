@@ -42,7 +42,7 @@ export function ThankYouModal({ onClose, surveyTitle, shareUrl }: ThankYouModalP
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md w-[95vw] max-h-[90vh] overflow-y-auto p-0 border-0 bg-transparent shadow-none">
+      <DialogContent className="sm:max-w-md w-[95vw] p-0 border-0 bg-transparent shadow-none overflow-hidden">
         <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
           {/* Gradient Border Effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-[2px]">
