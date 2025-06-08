@@ -98,3 +98,31 @@ export async function submitResponse(formData: FormData) {
     return { success: false, error: "An unexpected error occurred" }
   }
 }
+
+// Add the new simplified function for client-side use
+export async function submitResponseSimple({
+  audioUrl,
+  surveyId,
+  duration,
+}: {
+  audioUrl: string
+  surveyId: string
+  duration: number
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabaseServer.from("responses").insert([
+      {
+        audio_url: audioUrl,
+        survey_id: surveyId,
+        duration,
+        created_at: new Date().toISOString(),
+      },
+    ])
+
+    if (error) throw error
+    return { success: true }
+  } catch (e: any) {
+    console.error("Error in submitResponseSimple:", e)
+    return { success: false, error: e.message }
+  }
+}
