@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Loader2, AlertCircle } from "lucide-react"
+import { ArrowLeft, ArrowRight, Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 
 interface Survey {
@@ -31,7 +31,11 @@ export default function SurveyResponsePage() {
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showThankYou, setShowThankYou] = useState(false)
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+
+  // Multi-question state
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [responses, setResponses] = useState<Record<string, string>>({})
+  const [completedQuestions, setCompletedQuestions] = useState<Set<number>>(new Set())
 
   const supabase = createClient()
   const surveyId = params.id as string
@@ -47,7 +51,6 @@ export default function SurveyResponsePage() {
     setError(null)
 
     try {
-      // Fetch the survey data
       const { data, error } = await supabase.from("surveys").select("*").eq("id", surveyId).single()
 
       if (error) {
@@ -62,13 +65,11 @@ export default function SurveyResponsePage() {
         return
       }
 
-      // Check if survey has expired
       if (data.expires_at && new Date(data.expires_at) < new Date()) {
         setError("This survey has expired")
         return
       }
 
-      // Check if survey is active
       if (!data.is_active) {
         setError("This survey is no longer active")
         return
@@ -84,38 +85,69 @@ export default function SurveyResponsePage() {
     }
   }
 
-  const handleSubmit = async (audioBlob: Blob) => {
+  const handleNext = async (audioUrl: string) => {
     if (!survey) return
 
+    const currentQuestion = survey.questions[currentIndex]
+    const questionId = currentQuestion?.id || `q${currentIndex}`
+
+    // Update responses
+    const updated = { ...responses, [questionId]: audioUrl }
+    setResponses(updated)
+
+    // Mark current question as completed
+    const newCompleted = new Set(completedQuestions)
+    newCompleted.add(currentIndex)
+    setCompletedQuestions(newCompleted)
+
+    if (currentIndex < survey.questions.length - 1) {
+      // Move to next question
+      setCurrentIndex(currentIndex + 1)
+      toast.success(`Question ${currentIndex + 1} completed!`)
+    } else {
+      // All questions completed, submit final response
+      await handleFinalSubmit(updated)
+    }
+  }
+
+  const handleFinalSubmit = async (allResponses: Record<string, string>) => {
     setIsSubmitting(true)
 
     try {
-      console.log("Submitting audio response for survey:", surveyId)
+      console.log("Submitting final survey response:", allResponses)
 
-      // Create form data for the audio upload
-      const formData = new FormData()
-      formData.append("audio", audioBlob)
-      formData.append("surveyId", surveyId)
-      formData.append("email", email || "")
+      const { data, error } = await supabase.from("responses").insert([
+        {
+          survey_id: surveyId,
+          user_id: null, // Anonymous for now
+          answers: allResponses,
+          email: email || null,
+          created_at: new Date().toISOString(),
+        },
+      ])
 
-      // Upload to your API endpoint
-      const response = await fetch("/api/responses", {
-        method: "POST",
-        body: formData,
-      })
+      if (error) throw error
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to submit response")
-      }
-
-      toast.success("Response submitted successfully!")
+      console.log("Survey response submitted successfully:", data)
+      toast.success("All responses submitted successfully!")
       setShowThankYou(true)
     } catch (err: any) {
-      console.error("Error submitting response:", err)
-      toast.error(err.message || "Failed to submit your response. Please try again.")
+      console.error("Error submitting final response:", err)
+      toast.error("Failed to submit your responses. Please try again.")
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const goToPrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1)
+    }
+  }
+
+  const goToNext = () => {
+    if (currentIndex < (survey?.questions.length || 0) - 1) {
+      setCurrentIndex(currentIndex + 1)
     }
   }
 
@@ -152,7 +184,6 @@ export default function SurveyResponsePage() {
     )
   }
 
-  // No survey data
   if (!survey) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
@@ -174,62 +205,118 @@ export default function SurveyResponsePage() {
   }
 
   // Get current question
-  const currentQuestion =
-    survey.questions && survey.questions.length > 0
-      ? typeof survey.questions[currentQuestionIndex] === "string"
-        ? survey.questions[currentQuestionIndex]
-        : survey.questions[currentQuestionIndex]?.text || survey.questions[currentQuestionIndex]
-      : survey.title
+  const currentQuestion = survey.questions[currentIndex]
+  const questionText =
+    typeof currentQuestion === "string"
+      ? currentQuestion
+      : currentQuestion?.text || currentQuestion?.prompt || currentQuestion || survey.title
 
-  // Main content - Survey response form
+  const progress = ((currentIndex + 1) / survey.questions.length) * 100
+  const isLastQuestion = currentIndex === survey.questions.length - 1
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="mb-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{survey.title}</h1>
-            {survey.description && <p className="text-gray-600">{survey.description}</p>}
+          {/* Header with Progress */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-2xl font-bold text-gray-900">{survey.title}</h1>
+              <span className="text-sm text-gray-600">
+                {currentIndex + 1} of {survey.questions.length}
+              </span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            {survey.description && <p className="text-gray-600 text-center">{survey.description}</p>}
+          </div>
+
+          {/* Question Overview */}
+          <div className="mb-6">
+            <div className="flex flex-wrap gap-2 justify-center">
+              {survey.questions.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentIndex(index)}
+                  className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${
+                    index === currentIndex
+                      ? "bg-indigo-600 text-white"
+                      : completedQuestions.has(index)
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                  }`}
+                >
+                  {completedQuestions.has(index) ? <CheckCircle className="w-4 h-4 mx-auto" /> : index + 1}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Survey Card */}
           <Card className="shadow-lg border-0 overflow-hidden">
             <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-600"></div>
             <CardHeader>
-              <CardTitle className="text-xl">Question</CardTitle>
-              <CardDescription className="text-base font-medium text-gray-800">{currentQuestion}</CardDescription>
+              <CardTitle className="text-xl">
+                Question {currentIndex + 1}
+                {isLastQuestion && " (Final)"}
+              </CardTitle>
+              <CardDescription className="text-base font-medium text-gray-800">{questionText}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Audio Recorder */}
-              <AudioRecorder onSubmit={handleSubmit} isLoading={isSubmitting} />
+              <AudioRecorder
+                onSubmit={handleNext}
+                isLoading={isSubmitting}
+                key={currentIndex} // Reset recorder for each question
+              />
 
-              {/* Email Input */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email (optional)</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isSubmitting}
-                  className="w-full"
-                />
-                <p className="text-xs text-gray-500">Provide your email to get notified when others respond</p>
+              {/* Email Input (only show on first question) */}
+              {currentIndex === 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email (optional)</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500">Provide your email to get notified when others respond</p>
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="flex justify-between items-center pt-4">
+                <Button onClick={goToPrevious} disabled={currentIndex === 0} variant="outline" size="sm">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Previous
+                </Button>
+
+                <span className="text-sm text-gray-500">
+                  {completedQuestions.size} of {survey.questions.length} completed
+                </span>
+
+                <Button
+                  onClick={goToNext}
+                  disabled={currentIndex >= survey.questions.length - 1 || !completedQuestions.has(currentIndex)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Next
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
               </div>
             </CardContent>
           </Card>
-
-          {/* Watch Demo Link */}
-          <div className="mt-6 text-center">
-            <Button
-              variant="link"
-              className="text-indigo-600 hover:text-indigo-800"
-              onClick={() => toast.info("Demo feature coming soon!")}
-            >
-              Watch Demo
-            </Button>
-          </div>
         </div>
       </div>
 
