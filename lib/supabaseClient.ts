@@ -1,64 +1,76 @@
-import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
-import { createBrowserClient } from "@supabase/ssr"
-import type { Database } from "@/types/database.types"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
 
-// Validate environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Get environment variables
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing required Supabase environment variables")
+// Validate required environment variables
+if (!SUPABASE_URL) {
+  throw new Error("NEXT_PUBLIC_SUPABASE_URL is required. Please check your environment variables.")
 }
 
-// Browser client for client-side operations
-export const supabaseBrowser: SupabaseClient<Database> = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+if (!SUPABASE_ANON_KEY) {
+  throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required. Please check your environment variables.")
+}
+
+// Common options for both clients
+const commonOptions = {
   auth: {
-    storageKey: "audioform.auth",
     autoRefreshToken: true,
-    persistSession: true,
+    persistSession: false,
+  },
+  telemetry: false,
+}
+
+// Public (browser) client — only anon key
+export const supabaseBrowser: SupabaseClient<Database> = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  ...commonOptions,
+  auth: {
+    ...commonOptions.auth,
+    persistSession: true, // Enable session persistence for browser client
   },
 })
 
-// Server client for server-side operations (requires service role key)
-export const supabaseServer: SupabaseClient<Database> = createSupabaseClient<Database>(
-  supabaseUrl,
-  supabaseServiceKey || supabaseAnonKey, // Fallback to anon key if service key not available
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  },
-)
+// Server (service‑role) client — only created if the key is available
+let _supabaseServer: SupabaseClient<Database> | null = null
 
-// Export supabase as a named export (REQUIRED)
-export const supabase: SupabaseClient<Database> = supabaseBrowser
+// Function to get the server client, with lazy initialization
+export function getSupabaseServer(): SupabaseClient<Database> {
+  // Only create the server client if we're in a server context and have the key
+  if (typeof window === "undefined" && SUPABASE_SERVICE_ROLE_KEY) {
+    if (!_supabaseServer) {
+      _supabaseServer = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        ...commonOptions,
+        auth: {
+          ...commonOptions.auth,
+          persistSession: false, // Disable session persistence for server client
+        },
+      })
+    }
+    return _supabaseServer
+  }
 
-// Export createClient as a named export for compatibility
-export const createClient = (): SupabaseClient<Database> => {
-  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      storageKey: "audioform.auth",
-      autoRefreshToken: true,
-      persistSession: true,
-    },
-  })
+  // If we're on the client side or don't have the service role key, use the browser client
+  console.warn(
+    "Attempted to use supabaseServer in a client context or without a service role key. Falling back to supabaseBrowser.",
+  )
+  return supabaseBrowser
 }
 
-// Additional factory functions for flexibility
-export const createBrowserSupabaseClient = (): SupabaseClient<Database> => supabaseBrowser
+// For backward compatibility and convenience
+export const supabaseServer =
+  typeof window === "undefined" && SUPABASE_SERVICE_ROLE_KEY ? getSupabaseServer() : supabaseBrowser
 
-export const createServerSupabaseClient = (): SupabaseClient<Database> => supabaseServer
+// For backward compatibility
+export const supabase = supabaseBrowser
 
 // Helper function to get the appropriate client based on context
 export function getSupabaseClient(useAdmin = false): SupabaseClient<Database> {
   // Only use the admin client server-side when explicitly requested
-  if (useAdmin && typeof window === "undefined" && supabaseServiceKey) {
-    return supabaseServer
+  if (useAdmin && typeof window === "undefined" && SUPABASE_SERVICE_ROLE_KEY) {
+    return getSupabaseServer()
   }
   return supabaseBrowser
 }
-
-// Default export for backward compatibility
-export default supabaseBrowser

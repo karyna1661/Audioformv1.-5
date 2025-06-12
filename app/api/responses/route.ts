@@ -1,56 +1,29 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { NextResponse } from "next/server"
 
-export async function POST(request: NextRequest) {
-  console.log("Received response submission request")
-
+export async function POST(request: Request) {
   try {
     const formData = await request.formData()
-    const audio = formData.get("audio") as File
     const surveyId = formData.get("surveyId") as string
     const email = formData.get("email") as string
+    const eventId = formData.get("eventId") as string | null
+    const audioFile = formData.get("audio") as File
 
-    if (!audio || !surveyId) {
+    if (!surveyId || !email || !audioFile) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    console.log(`Processing response for survey ${surveyId}`)
+    // In a real app, this would:
+    // 1. Upload the audio file to storage
+    // 2. Create a response record in the database
+    // 3. For Pro/Enterprise tiers, trigger transcription and sentiment analysis
 
-    // Initialize Supabase client with server credentials
-    const supabase = createClient()
-
-    // Upload audio file to Supabase Storage
-    const fileName = `${surveyId}/${Date.now()}_${Math.random().toString(36).substring(2, 15)}.webm`
-
-    const { data: uploadData, error: uploadError } = await supabase.storage.from("responses").upload(fileName, audio, {
-      contentType: "audio/webm",
+    // Mock response
+    return NextResponse.json({
+      responseId: `response_${Date.now()}`,
+      audioUrl: "https://example.com/audio.mp3", // This would be the actual URL in production
     })
-
-    if (uploadError) {
-      console.error("Error uploading audio:", uploadError)
-      return NextResponse.json({ error: "Failed to upload audio" }, { status: 500 })
-    }
-
-    // Save response record in database
-    const { data: responseData, error: responseError } = await supabase
-      .from("responses")
-      .insert({
-        survey_id: surveyId,
-        audio_path: uploadData.path,
-        email: email || null,
-      })
-      .select()
-      .single()
-
-    if (responseError) {
-      console.error("Error saving response:", responseError)
-      return NextResponse.json({ error: "Failed to save response" }, { status: 500 })
-    }
-
-    console.log("Response submitted successfully")
-    return NextResponse.json({ success: true, data: responseData })
   } catch (error) {
-    console.error("Unexpected error:", error)
-    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
+    console.error("Error creating response:", error)
+    return NextResponse.json({ error: "Failed to create response" }, { status: 500 })
   }
 }

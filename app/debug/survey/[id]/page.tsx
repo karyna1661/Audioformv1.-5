@@ -1,35 +1,35 @@
 "use client"
 
-import { useParams } from "next/navigation"
 import { SurveyDebug } from "@/components/debug/survey-debug"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
-export default function DebugSurveyPage() {
-  const params = useParams()
-  const surveyId = params.id as string
+export default function SurveyDebugPage({ params }: { params: { id: string } }) {
+  const surveyId = params.id
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Survey Debug Page</h1>
-      <p className="mb-4">Debugging survey with ID: {surveyId}</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-2xl mx-auto">
+        <div className="mb-4">
+          <Link href="/">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </Link>
+        </div>
 
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-2">Survey Data</h2>
-        <SurveyDebug surveyId={surveyId} />
-      </div>
-
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-2">Environment</h2>
-        <pre className="p-4 bg-gray-100 rounded overflow-auto">
-          {JSON.stringify(
-            {
-              NODE_ENV: process.env.NODE_ENV,
-              NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? "Set" : "Not set",
-              NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Set" : "Not set",
-            },
-            null,
-            2,
-          )}
-        </pre>
+        <Card>
+          <CardHeader>
+            <CardTitle>Survey Debug Tool</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 mb-4">Use this tool to diagnose issues with survey loading.</p>
+            <SurveyDebug surveyId={surveyId} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
