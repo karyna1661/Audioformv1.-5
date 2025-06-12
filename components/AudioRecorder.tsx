@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Mic, Square, Play, Pause, RotateCcw, Upload } from "lucide-react"
+import { Mic, Square, Play, Pause, RotateCcw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { v4 as uuidv4 } from "uuid"
@@ -11,24 +11,15 @@ interface AudioRecorderProps {
   onSubmit: (audioUrl: string, duration: number) => void
   isLoading?: boolean
   disabled?: boolean
-  questionId: string
-  existingResponse?: { audioUrl: string; duration: number }
 }
 
-export function AudioRecorder({
-  onSubmit,
-  isLoading = false,
-  disabled = false,
-  questionId,
-  existingResponse,
-}: AudioRecorderProps) {
+export function AudioRecorder({ onSubmit, isLoading = false, disabled = false }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [audioUrl, setAudioUrl] = useState<string | null>(existingResponse?.audioUrl || null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [hasResponse, setHasResponse] = useState(!!existingResponse)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -43,20 +34,6 @@ export function AudioRecorder({
       }
     }
   }, [])
-
-  useEffect(() => {
-    // Reset state when question changes
-    if (existingResponse) {
-      setAudioUrl(existingResponse.audioUrl)
-      setHasResponse(true)
-      setRecordingTime(existingResponse.duration)
-    } else {
-      setAudioUrl(null)
-      setHasResponse(false)
-      setRecordingTime(0)
-      setAudioBlob(null)
-    }
-  }, [questionId, existingResponse])
 
   const startRecording = async () => {
     try {
@@ -87,8 +64,6 @@ export function AudioRecorder({
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1)
       }, 1000)
-
-      toast.success("Recording started")
     } catch (error) {
       console.error("Error starting recording:", error)
       toast.error("Failed to start recording. Please check microphone permissions.")
@@ -104,8 +79,6 @@ export function AudioRecorder({
         clearInterval(timerRef.current)
         timerRef.current = null
       }
-
-      toast.success("Recording stopped")
     }
   }
 
@@ -132,13 +105,12 @@ export function AudioRecorder({
 
   const resetRecording = () => {
     setAudioBlob(null)
-    if (audioUrl && !existingResponse) {
+    if (audioUrl) {
       URL.revokeObjectURL(audioUrl)
       setAudioUrl(null)
     }
     setIsPlaying(false)
     setRecordingTime(0)
-    setHasResponse(false)
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
@@ -152,7 +124,7 @@ export function AudioRecorder({
 
     try {
       // Generate unique filename
-      const filePath = `audio-responses/${questionId}/${uuidv4()}.webm`
+      const filePath = `audio-responses/${uuidv4()}.webm`
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage.from("audio-responses").upload(filePath, audioBlob, {
@@ -162,6 +134,7 @@ export function AudioRecorder({
       if (error) {
         console.error("Upload failed:", error)
         toast.error("Failed to upload recording. Please try again.")
+        setIsUploading(false)
         return
       }
 
@@ -172,9 +145,9 @@ export function AudioRecorder({
 
       // Call parent callback with the URL and duration
       onSubmit(publicUrl, recordingTime)
-      setHasResponse(true)
 
-      toast.success("Recording saved successfully!")
+      // Reset state
+      resetRecording()
     } catch (err: any) {
       console.error("Unexpected error during upload:", err)
       toast.error("An unexpected error occurred. Please try again.")
@@ -194,7 +167,7 @@ export function AudioRecorder({
   return (
     <div className="space-y-6">
       {/* Recording Interface */}
-      <div className="flex flex-col items-center space-y-6">
+      <div className="flex flex-col items-center space-y-4">
         {/* Recording Button */}
         <div className="relative">
           <Button
@@ -209,32 +182,26 @@ export function AudioRecorder({
           >
             {isRecording ? <Square className="w-8 h-8 text-white" /> : <Mic className="w-8 h-8 text-white" />}
           </Button>
+
+          {/* Recording indicator dots */}
+          {isRecording && (
+            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-1">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "0s" }}></div>
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+            </div>
+          )}
         </div>
 
-        {/* Recording Status - Fixed positioning */}
-        <div className="text-center space-y-2">
+        {/* Recording Status */}
+        <div className="text-center">
           {isRecording ? (
-            <>
+            <div className="space-y-1">
               <p className="text-sm font-medium text-red-600">Recording...</p>
               <p className="text-lg font-mono text-gray-900">{formatTime(recordingTime)}</p>
-              {/* Recording indicator dots - positioned below text */}
-              <div className="flex items-center justify-center space-x-1 pt-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "0s" }}></div>
-                <div
-                  className="w-2 h-2 bg-red-500 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                ></div>
-                <div
-                  className="w-2 h-2 bg-red-500 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.4s" }}
-                ></div>
-              </div>
-            </>
-          ) : hasResponse ? (
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-green-600">✓ Response recorded</p>
-              <p className="text-sm text-gray-600">Duration: {formatTime(recordingTime)}</p>
             </div>
+          ) : audioBlob ? (
+            <p className="text-sm font-medium text-green-600">Recording complete</p>
           ) : (
             <p className="text-sm text-gray-600">Tap to start recording</p>
           )}
@@ -242,8 +209,8 @@ export function AudioRecorder({
       </div>
 
       {/* Playback Controls - Properly aligned */}
-      {audioUrl && !isRecording && (
-        <div className="flex justify-center gap-3">
+      {audioBlob && !isRecording && (
+        <div className="flex justify-center space-x-3">
           <Button
             onClick={isPlaying ? pauseAudio : playAudio}
             variant="outline"
@@ -269,7 +236,7 @@ export function AudioRecorder({
       )}
 
       {/* Submit Button */}
-      {audioBlob && !isRecording && !hasResponse && (
+      {audioBlob && !isRecording && (
         <div className="flex justify-center">
           <Button
             onClick={handleRecordingComplete}
@@ -279,17 +246,16 @@ export function AudioRecorder({
             {isProcessing ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                {isUploading ? "Uploading..." : "Saving..."}
+                {isUploading ? "Uploading..." : "Submitting..."}
               </>
             ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" />
-                Save Response
-              </>
+              "Submit Response"
             )}
           </Button>
         </div>
       )}
+
+      {/* Demo link removed */}
     </div>
   )
 }
