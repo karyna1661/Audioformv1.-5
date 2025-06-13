@@ -7,7 +7,7 @@ import { ArrowLeft, AlertCircle, Clock } from "lucide-react"
 import { AudioRecorder } from "@/components/AudioRecorder"
 import { ThankYouModal } from "@/components/ThankYouModal"
 import { Footer } from "@/components/layout/footer"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client" // Import the singleton instance directly
 import { toast } from "sonner"
 
 interface Question {
@@ -37,7 +37,7 @@ export default function SurveyResponsePage() {
   const [showThankYou, setShowThankYou] = useState(false)
 
   const surveyId = params.id as string
-  const supabase = createClient()
+  // No need to create a new client instance here
 
   useEffect(() => {
     if (surveyId) {
@@ -109,6 +109,7 @@ export default function SurveyResponsePage() {
     }
   }
 
+  // Rest of the component remains the same...
   const handleAudioSubmit = async (audioBlob: Blob) => {
     if (!survey) return
 

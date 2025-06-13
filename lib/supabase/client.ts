@@ -1,14 +1,13 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/database.types"
 
-export const supabase = createBrowserClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      storageKey: "audioform.auth",
-      autoRefreshToken: true,
-      persistSession: true,
-    },
-  },
-)
+// Create a singleton instance for client components
+export const supabase = createClientComponentClient<Database>()
+
+// For compatibility with existing code
+export const createClient = () => {
+  console.warn("createClient() is deprecated. Please use the supabase instance directly.")
+  return createClientComponentClient<Database>()
+}
+
+export default supabase
