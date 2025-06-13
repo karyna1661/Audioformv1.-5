@@ -4,9 +4,11 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, Square, Play, Pause, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { supabase } from "@/lib/supabase/client"
+import { v4 as uuidv4 } from "uuid"
 
 interface AudioRecorderProps {
-  onSubmit: (audioBlob: Blob) => void
+  onSubmit: (audioBlob: Blob, audioUrl: string) => void
   isLoading: boolean
 }
 
@@ -15,6 +17,7 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -81,9 +84,46 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
     setIsPlaying(false)
   }
 
-  const handleSubmit = () => {
-    if (audioBlob) {
-      onSubmit(audioBlob)
+  const handleSubmit = async () => {
+    if (!audioBlob) return
+
+    setIsUploading(true)
+
+    try {
+      // Generate unique filename
+      const filePath = `audio-responses/${uuidv4()}.webm`
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage.from("audio-responses").upload(filePath, audioBlob, {
+        contentType: "audio/webm",
+      })
+
+      if (error) {
+        console.error("Upload failed:", error)
+        toast.error("Failed to upload recording. Please try again.")
+        setIsUploading(false)
+        return
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage.from("audio-responses").getPublicUrl(filePath)
+      const publicUrl = urlData.publicUrl
+
+      // Call parent callback with the URL
+      onSubmit(audioBlob, publicUrl)
+
+      // Reset state
+      setAudioBlob(null)
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl)
+        setAudioUrl(null)
+      }
+      setIsPlaying(false)
+    } catch (err) {
+      console.error("Unexpected error during upload:", err)
+      toast.error("An unexpected error occurred. Please try again.")
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -104,7 +144,7 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
           <div className="space-y-4">
             <Button
               onClick={startRecording}
-              disabled={isLoading}
+              disabled={isLoading || isUploading}
               className="w-full h-16 text-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
               size="lg"
             >
@@ -156,7 +196,7 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
                 onClick={resetRecording}
                 variant="outline"
                 size="sm"
-                disabled={isLoading}
+                disabled={isLoading || isUploading}
                 className="border-indigo-200 hover:bg-indigo-50 text-indigo-600 shadow-sm"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
@@ -181,14 +221,14 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
       {audioBlob && (
         <Button
           onClick={handleSubmit}
-          disabled={isLoading}
+          disabled={isLoading || isUploading}
           className="w-full h-12 text-base font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
           size="lg"
         >
-          {isLoading ? (
+          {isLoading || isUploading ? (
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Submitting...</span>
+              <span>{isUploading ? "Uploading..." : "Submitting..."}</span>
             </div>
           ) : (
             "Submit Response"

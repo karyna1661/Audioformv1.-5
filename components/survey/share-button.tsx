@@ -2,99 +2,73 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Copy, Share2, ExternalLink, QrCode } from "lucide-react"
+import { Copy, Check, QrCode } from "lucide-react"
 import { toast } from "sonner"
-import { QRCodeModal } from "./qr-code-modal"
-import { getSurveyResponseUrl, getFarcasterShareUrl } from "@/utils/url-utils"
+import { getSurveyResponseUrl } from "@/utils/url-utils"
 
 interface ShareButtonProps {
   surveyId: string
   surveyTitle: string
   className?: string
-  variant?: "default" | "outline" | "ghost"
-  size?: "default" | "sm" | "lg"
 }
 
-export function ShareButton({
-  surveyId,
-  surveyTitle,
-  className,
-  variant = "outline",
-  size = "default",
-}: ShareButtonProps) {
+export function ShareButton({ surveyId, surveyTitle, className }: ShareButtonProps) {
+  const [copied, setCopied] = useState(false)
   const [showQR, setShowQR] = useState(false)
 
-  // Use utility function for consistent URL construction
-  const shareUrl = getSurveyResponseUrl(surveyId)
+  const responseUrl = getSurveyResponseUrl(surveyId)
 
-  const handleCopyLink = async () => {
+  const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl)
-      toast.success("Survey link copied!")
-    } catch (error) {
+      await navigator.clipboard.writeText(responseUrl)
+      setCopied(true)
+      toast.success("Link copied to clipboard!")
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Failed to copy:", err)
       toast.error("Failed to copy link")
     }
   }
 
-  const handleShareOnFarcaster = () => {
-    const text = `Voice your thoughts on "${surveyTitle}" 🎙️`
-    const farcasterUrl = getFarcasterShareUrl(text, shareUrl)
-    window.open(farcasterUrl, "_blank", "noopener,noreferrer")
-  }
-
-  const handleNativeShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: surveyTitle,
-          text: "Voice your thoughts on this survey",
-          url: shareUrl,
-        })
-      } catch (error) {
-        // User cancelled or error occurred
-        console.log("Share cancelled")
-      }
-    } else {
-      handleCopyLink()
-    }
+  const toggleQR = () => {
+    setShowQR(!showQR)
   }
 
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant={variant} size={size} className={className}>
-            <Share2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-            <span className="text-xs sm:text-sm">Share</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44 sm:w-48">
-          <DropdownMenuItem onClick={handleCopyLink} className="text-sm">
-            <Copy className="h-4 w-4 mr-2" />
-            Copy Link
-          </DropdownMenuItem>
+    <div className={className}>
+      <div className="flex gap-2">
+        <Button
+          onClick={handleCopy}
+          variant="outline"
+          className="flex-1 h-12 border-indigo-200 hover:bg-indigo-50 text-indigo-700"
+        >
+          {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+          {copied ? "Copied!" : "Copy Link"}
+        </Button>
 
-          <DropdownMenuItem onClick={handleShareOnFarcaster} className="text-sm">
-            <ExternalLink className="h-4 w-4 mr-2" />
-            Share on Farcaster
-          </DropdownMenuItem>
+        <Button
+          onClick={toggleQR}
+          variant="outline"
+          className="h-12 border-indigo-200 hover:bg-indigo-50 text-indigo-700"
+        >
+          <QrCode className="h-4 w-4" />
+        </Button>
+      </div>
 
-          <DropdownMenuItem onClick={() => setShowQR(true)} className="text-sm">
-            <QrCode className="h-4 w-4 mr-2" />
-            Show QR Code
-          </DropdownMenuItem>
-
-          {navigator.share && (
-            <DropdownMenuItem onClick={handleNativeShare} className="text-sm">
-              <Share2 className="h-4 w-4 mr-2" />
-              Native Share
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <QRCodeModal isOpen={showQR} onClose={() => setShowQR(false)} url={shareUrl} title={surveyTitle} />
-    </>
+      {showQR && (
+        <div className="mt-4 p-4 bg-white rounded-lg border border-indigo-100 flex flex-col items-center">
+          <div className="mb-2 text-sm font-medium text-gray-700">Scan to respond:</div>
+          <div className="bg-white p-2 rounded-lg shadow-sm">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(responseUrl)}`}
+              alt="QR Code"
+              width={200}
+              height={200}
+            />
+          </div>
+          <div className="mt-2 text-xs text-gray-500 text-center">{surveyTitle}</div>
+        </div>
+      )}
+    </div>
   )
 }
