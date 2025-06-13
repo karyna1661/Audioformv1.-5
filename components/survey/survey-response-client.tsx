@@ -1,178 +1,227 @@
 "use client"
 
 import { useState } from "react"
-import { AudioRecorder } from "@/components/AudioRecorder"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { ArrowLeft, ArrowRight, Clock } from "lucide-react"
+import { AudioRecorder } from "@/components/AudioRecorder"
+import { ThankYouModal } from "@/components/ThankYouModal"
 import { supabase } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 interface SurveyResponseClientProps {
   survey: {
     id: string
     title: string
+    description?: string
     questions: any[]
     created_at: string
+    expires_at?: string
   }
 }
 
 export default function SurveyResponseClient({ survey }: SurveyResponseClientProps) {
+  const router = useRouter()
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [responses, setResponses] = useState<Record<string, { audioUrl: string; duration: number }>>({})
-  const [showThankYou, setShowThankYou] = useState(false)
+  const [responses, setResponses] = useState<Record<string, string>>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [showThankYouModal, setShowThankYouModal] = useState(false)
 
-  const currentQuestion = survey.questions?.[currentQuestionIndex] || {
-    id: "default",
-    text: "What are your thoughts?",
-  }
+  // Ensure questions is an array
+  const questions = Array.isArray(survey.questions)
+    ? survey.questions
+    : typeof survey.questions === "object"
+      ? Object.values(survey.questions)
+      : []
 
-  const totalQuestions = survey.questions?.length || 1
-  const isLastQuestion = currentQuestionIndex === totalQuestions - 1
-  const isFirstQuestion = currentQuestionIndex === 0
+  const currentQuestion = questions[currentQuestionIndex]
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100
+  const isLastQuestion = currentQuestionIndex === questions.length - 1
 
-  const handlePrevious = () => {
-    if (!isFirstQuestion) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1)
-    }
-  }
-
-  const handleNext = () => {
-    if (!isLastQuestion) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
-    }
-  }
-
-  const handleAudioSubmit = async (audioBlob: Blob, audioUrl: string) => {
-    // Save response for current question
-    setResponses({
-      ...responses,
-      [currentQuestion.id]: {
-        audioUrl,
-        duration: 0, // You could calculate this if needed
-      },
-    })
-
-    // If last question, submit all responses
-    if (isLastQuestion) {
-      await submitAllResponses()
-    } else {
-      // Move to next question
-      handleNext()
-      toast.success("Response recorded! Moving to next question.")
-    }
-  }
-
-  const submitAllResponses = async () => {
-    setIsSubmitting(true)
+  const handleAudioSubmit = async (audioBlob: Blob) => {
+    if (!currentQuestion) return
 
     try {
-      // Create a survey submission record
-      const { data: submission, error: submissionError } = await supabase
-        .from("survey_submissions")
-        .insert({
-          survey_id: survey.id,
-          response_count: Object.keys(responses).length,
-          completed_at: new Date().toISOString(),
-        })
-        .select("id")
-        .single()
+      // Upload audio to Supabase storage
+      const filename = `${survey.id}/${currentQuestion.id}_${Date.now()}.webm`
+      const formData = new FormData()
+      formData.append("audio", audioBlob)
 
-      if (submissionError) {
-        throw new Error(`Failed to create submission: ${submissionError.message}`)
-      }
-
-      // Create individual response records
-      const responsePromises = Object.entries(responses).map(([questionId, { audioUrl }]) => {
-        return supabase.from("survey_responses").insert({
-          survey_id: survey.id,
-          question_id: questionId,
-          audio_url: audioUrl,
-          submission_id: submission.id,
-        })
+      const response = await fetch("/api/responses", {
+        method: "POST",
+        body: formData,
       })
 
-      await Promise.all(responsePromises)
+      if (!response.ok) {
+        throw new Error("Failed to upload audio")
+      }
 
-      // Show thank you message
-      setShowThankYou(true)
-      toast.success("Thank you for completing the survey!")
+      const { url } = await response.json()
+
+      // Store the response URL
+      setResponses((prev) => ({
+        ...prev,
+        [currentQuestion.id]: url,
+      }))
+
+      // Move to next question or submit all responses
+      if (!isLastQuestion) {
+        setCurrentQuestionIndex((prev) => prev + 1)
+        toast.success("Response recorded! Moving to next question.")
+      } else {
+        // Submit all responses
+        await submitResponses({
+          ...responses,
+          [currentQuestion.id]: url,
+        })
+      }
+    } catch (error) {
+      console.error("Error handling audio submission:", error)
+      toast.error("Failed to save your response. Please try again.")
+    }
+  }
+
+  const submitResponses = async (allResponses: Record<string, string>) => {
+    try {
+      setSubmitting(true)
+
+      // Submit to Supabase
+      const { error } = await supabase.from("responses").insert({
+        survey_id: survey.id,
+        answers: allResponses,
+        created_at: new Date().toISOString(),
+      })
+
+      if (error) throw error
+
+      toast.success("All responses submitted successfully!")
+      setShowThankYouModal(true)
     } catch (error) {
       console.error("Error submitting responses:", error)
       toast.error("Failed to submit responses. Please try again.")
     } finally {
-      setIsSubmitting(false)
+      setSubmitting(false)
     }
   }
 
-  if (showThankYou) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl">Thank You!</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p>Your responses have been submitted successfully.</p>
-            <Button
-              onClick={() => (window.location.href = "/")}
-              className="bg-gradient-to-r from-indigo-500 to-purple-600"
-            >
-              Return Home
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex((prev) => prev - 1)
+    }
   }
 
+  // Generate share link with proper base URL
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
+  const shareLink = `${baseUrl}/respond/${survey.id}`
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl">{survey.title}</CardTitle>
-          <div className="text-center text-sm text-gray-500 mt-2">
-            Question {currentQuestionIndex + 1} of {totalQuestions}
-          </div>
-
-          {/* Progress indicator */}
-          <div className="flex justify-center mt-4 space-x-2">
-            {Array.from({ length: totalQuestions }).map((_, index) => (
-              <div
-                key={index}
-                className={`w-3 h-3 rounded-full ${
-                  index === currentQuestionIndex
-                    ? "bg-indigo-600"
-                    : index < currentQuestionIndex
-                      ? "bg-green-500"
-                      : "bg-gray-300"
-                }`}
-              />
-            ))}
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          <div className="text-lg font-medium text-center mb-6">{currentQuestion.text}</div>
-
-          <AudioRecorder onSubmit={handleAudioSubmit} isLoading={isSubmitting} />
-
-          {/* Navigation buttons */}
-          <div className="flex justify-between pt-4">
-            <Button variant="outline" onClick={handlePrevious} disabled={isFirstQuestion || isSubmitting}>
-              Previous
-            </Button>
-
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <Button
-              variant="outline"
-              onClick={handleNext}
-              disabled={isLastQuestion || isSubmitting || !responses[currentQuestion.id]}
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="text-gray-600 hover:text-gray-900"
             >
-              Next
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
             </Button>
+            <div className="text-center flex-1 mx-4">
+              <h1 className="text-lg font-semibold text-gray-900 truncate">{survey.title}</h1>
+              {survey.description && <p className="text-sm text-gray-600 truncate">{survey.description}</p>}
+            </div>
+            <div className="w-16"></div>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Progress Bar */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+              <span>
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </span>
+              <span>{Math.round(progress)}% complete</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto">
+          {currentQuestion && (
+            <Card className="shadow-sm border">
+              <CardHeader>
+                <CardTitle className="text-xl">
+                  Question {currentQuestionIndex + 1}
+                  {isLastQuestion && " (Final)"}
+                </CardTitle>
+                <CardDescription className="text-base">
+                  {currentQuestion.prompt || currentQuestion.text || "Please record your response"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <AudioRecorder onSubmit={handleAudioSubmit} isLoading={submitting} />
+
+                {/* Navigation */}
+                <div className="flex justify-between items-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={handlePrevious}
+                    disabled={currentQuestionIndex === 0}
+                    className="flex items-center"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Previous
+                  </Button>
+
+                  <div className="text-sm text-gray-500 flex items-center">
+                    {Object.keys(responses).length > 0 && (
+                      <>
+                        <Clock className="w-4 h-4 mr-1" />
+                        {Object.keys(responses).length} of {questions.length} answered
+                      </>
+                    )}
+                  </div>
+
+                  {!isLastQuestion && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentQuestionIndex((prev) => prev + 1)}
+                      disabled={!responses[currentQuestion.id]}
+                      className="flex items-center"
+                    >
+                      Next
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Thank You Modal */}
+      {showThankYouModal && (
+        <ThankYouModal
+          onClose={() => {
+            setShowThankYouModal(false)
+            router.push("/")
+          }}
+          surveyTitle={survey.title}
+          shareUrl={shareLink}
+        />
+      )}
     </div>
   )
 }

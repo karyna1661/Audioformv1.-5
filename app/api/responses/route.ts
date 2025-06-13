@@ -1,29 +1,43 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
+    const audio = formData.get("audio") as File
     const surveyId = formData.get("surveyId") as string
-    const email = formData.get("email") as string
-    const eventId = formData.get("eventId") as string | null
-    const audioFile = formData.get("audio") as File
+    const questionId = formData.get("questionId") as string
 
-    if (!surveyId || !email || !audioFile) {
+    if (!audio || !surveyId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // In a real app, this would:
-    // 1. Upload the audio file to storage
-    // 2. Create a response record in the database
-    // 3. For Pro/Enterprise tiers, trigger transcription and sentiment analysis
+    // Initialize Supabase client
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-    // Mock response
+    // Upload to Supabase Storage
+    const filename = `responses/${surveyId}/${questionId || "response"}_${Date.now()}.webm`
+    const { data, error } = await supabase.storage
+      .from("demo-audio") // Use correct bucket name
+      .upload(filename, audio, {
+        cacheControl: "3600",
+        upsert: true,
+      })
+
+    if (error) {
+      console.error("Storage upload error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage.from("demo-audio").getPublicUrl(filename)
+
     return NextResponse.json({
-      responseId: `response_${Date.now()}`,
-      audioUrl: "https://example.com/audio.mp3", // This would be the actual URL in production
+      success: true,
+      url: publicUrlData.publicUrl,
     })
-  } catch (error) {
-    console.error("Error creating response:", error)
-    return NextResponse.json({ error: "Failed to create response" }, { status: 500 })
+  } catch (error: any) {
+    console.error("Response upload error:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

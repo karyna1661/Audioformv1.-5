@@ -9,10 +9,10 @@ import { createClient } from "./client"
 export async function uploadAudio(file: File, path: string): Promise<string> {
   const supabase = createClient()
 
-  // Upload the file to the demo-audio bucket
+  // Upload the file to the demo-audio bucket (ensure correct bucket name)
   const { data, error } = await supabase.storage.from("demo-audio").upload(path, file, {
     cacheControl: "3600",
-    upsert: false,
+    upsert: true, // Allow overwriting existing files
   })
 
   if (error) {
