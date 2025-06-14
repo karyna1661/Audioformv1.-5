@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@farcaster/frame-sdk": "^0.1.0",
     "@hookform/resolvers": "^3.3.4",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",

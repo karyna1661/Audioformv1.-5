@@ -19,16 +19,17 @@ export default function ResponseForm({ surveyId, question, onComplete, isFrame =
   useEffect(() => {
     // Check if we're in a Farcaster frame
     if (isFrame || (typeof window !== "undefined" && window.location.search.includes("frame=true"))) {
-      // Get frame context from URL parameters or postMessage
+      // Get frame context from URL parameters
       const urlParams = new URLSearchParams(window.location.search)
       const fid = urlParams.get("fid")
       const castId = urlParams.get("castId")
+      const frameButton = urlParams.get("frameButton")
 
-      if (fid || castId) {
-        setFrameContext({ fid, castId })
+      if (fid || castId || frameButton) {
+        setFrameContext({ fid, castId, frameButton })
       }
 
-      // Listen for frame messages
+      // Listen for frame messages from parent
       const handleMessage = (event: MessageEvent) => {
         if (event.data?.type === "frame_context") {
           setFrameContext(event.data.context)
@@ -90,7 +91,7 @@ export default function ResponseForm({ surveyId, question, onComplete, isFrame =
 
       // Handle frame completion
       if (isFrame) {
-        // Post back to frame
+        // Post back to frame parent
         if (window.parent !== window) {
           window.parent.postMessage(
             {
@@ -121,7 +122,7 @@ export default function ResponseForm({ surveyId, question, onComplete, isFrame =
 
         {isFrame && (
           <div className="mt-4 text-center">
-            <div className="text-sm text-gray-500">Recording in Farcaster Frame</div>
+            <div className="text-sm text-gray-500">🎯 Recording in Farcaster Frame</div>
             {frameContext?.fid && <div className="text-xs text-gray-400 mt-1">FID: {frameContext.fid}</div>}
           </div>
         )}
