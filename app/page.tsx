@@ -1,8 +1,8 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Mic, Users, Share, Zap, ArrowRight, Play, BarChart, Clock } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Mic, Zap, ArrowRight, Play } from "lucide-react"
 import Link from "next/link"
 import Head from "next/head"
 
@@ -18,7 +18,7 @@ export default function HomePage() {
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         {/* Header */}
         <header className="px-4 py-4 sm:px-6 lg:px-8">
           <nav className="flex items-center justify-between max-w-7xl mx-auto">
@@ -112,7 +112,7 @@ export default function HomePage() {
         {/* Features Section - Fixed Desktop Grid */}
         <section className="px-4 py-16 sm:py-20 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-12 sm:mb-16">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
                 Why Voice Surveys Work Better
               </h2>
@@ -122,77 +122,39 @@ export default function HomePage() {
             </div>
 
             {/* Fixed Grid Layout - 6 boxes in 2 rows of 3 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
-              {/* First Row */}
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
-                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                    <Mic className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Authentic Responses</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
-                    Capture genuine emotions and spontaneous thoughts that written surveys miss.
+            <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Voice-First</CardTitle>
+                  <CardDescription>Collect authentic audio responses from your audience</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600">
+                    Enable natural, conversational feedback through voice recordings
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
-                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                    <Zap className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Lightning Fast</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
-                    Create and share surveys in under 60 seconds. No complex setup required.
+              <Card>
+                <CardHeader>
+                  <CardTitle>Easy Sharing</CardTitle>
+                  <CardDescription>Share surveys via link, QR code, or social media</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600">
+                    Multiple sharing options to reach your audience wherever they are
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
-                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                    <Share className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Easy Sharing</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
-                    Share via link, QR code, or social media. Works on any device with a microphone.
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Second Row */}
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
-                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                    <Users className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Higher Engagement</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
-                    Voice surveys get 3x more responses than traditional text-based forms.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
-                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                    <BarChart className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Real-time Insights</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
-                    Get immediate feedback and analyze responses as they come in.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow h-full">
-                <CardContent className="p-6 sm:p-8 text-center h-full flex flex-col">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                    <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-600" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Mobile Optimized</h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed flex-grow">
-                    Perfect for mobile users. Record and submit responses in seconds.
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Setup</CardTitle>
+                  <CardDescription>Create and deploy surveys in minutes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600">
+                    Simple interface to get your voice surveys up and running fast
                   </p>
                 </CardContent>
               </Card>

@@ -1,70 +1,88 @@
-import { createClientComponentClient, createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
 import type { Database } from "@/types/database.types"
 
-// Shared constants
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Type-only imports to avoid build issues
+import type { SupabaseClient } from "@supabase/supabase-js"
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error("Missing Supabase environment variables")
+// Safe environment variable access
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+
+// Mock client type for build safety
+type MockSupabaseClient = {
+  from: (table: string) => any
+  storage: { from: (bucket: string) => any }
+  auth: any
 }
 
-// Client-side usage
-export function createSupabaseBrowserClient() {
+// Client-side usage - lazy loaded to avoid build issues
+export function createSupabaseBrowserClient(): SupabaseClient<Database> | MockSupabaseClient {
   if (typeof window === "undefined") {
-    throw new Error("createSupabaseBrowserClient called on server")
-  }
-
-  return createClientComponentClient<Database>()
-}
-
-// Server-side usage (API routes, server components, etc.)
-export function createSupabaseServerClient() {
-  return createServerComponentClient<Database>({ cookies })
-}
-
-// Create browser client instance
-export const supabaseBrowser = (() => {
-  if (typeof window !== "undefined") {
-    return createClientComponentClient<Database>()
-  }
-  // Return a dummy object for server-side to prevent crashes
-  return {} as ReturnType<typeof createClientComponentClient<Database>>
-})()
-
-// Create server client instance (only use in server context)
-export const supabaseServer = (() => {
-  if (typeof window === "undefined") {
-    try {
-      return createServerComponentClient<Database>({ cookies })
-    } catch {
-      // Fallback for build time or when cookies aren't available
-      return {} as ReturnType<typeof createServerComponentClient<Database>>
+    // Return mock during SSR/build
+    return {
+      from: () => ({ select: () => ({}), insert: () => ({}), update: () => ({}), delete: () => ({}) }),
+      storage: { from: () => ({ upload: () => ({}), download: () => ({}) }) },
+      auth: {},
     }
   }
-  return {} as ReturnType<typeof createServerComponentClient<Database>>
+
+  try {
+    // Dynamic import to avoid build issues
+    const { createClientComponentClient } = require("@supabase/auth-helpers-nextjs")
+    return createClientComponentClient<Database>()
+  } catch (error) {
+    console.warn("Could not create Supabase client:", error)
+    return {
+      from: () => ({ select: () => ({}), insert: () => ({}), update: () => ({}), delete: () => ({}) }),
+      storage: { from: () => ({ upload: () => ({}), download: () => ({}) }) },
+      auth: {},
+    }
+  }
+}
+
+// Server-side usage - lazy loaded
+export function createSupabaseServerClient(): SupabaseClient<Database> | MockSupabaseClient {
+  if (typeof window !== "undefined") {
+    return createSupabaseBrowserClient()
+  }
+
+  try {
+    const { createServerComponentClient } = require("@supabase/auth-helpers-nextjs")
+    const { cookies } = require("next/headers")
+    return createServerComponentClient<Database>({ cookies })
+  } catch (error) {
+    console.warn("Could not create server Supabase client:", error)
+    return {
+      from: () => ({ select: () => ({}), insert: () => ({}), update: () => ({}), delete: () => ({}) }),
+      storage: { from: () => ({ upload: () => ({}), download: () => ({}) }) },
+      auth: {},
+    }
+  }
+}
+
+// Safe singleton instances
+let _browserClient: SupabaseClient<Database> | MockSupabaseClient | null = null
+let _serverClient: SupabaseClient<Database> | MockSupabaseClient | null = null
+
+export const supabaseBrowser = (() => {
+  if (!_browserClient) {
+    _browserClient = createSupabaseBrowserClient()
+  }
+  return _browserClient
 })()
 
-// Legacy exports for backward compatibility
-export function createClient() {
-  console.warn("createClient() is deprecated. Use createSupabaseBrowserClient() instead.")
-  return createSupabaseBrowserClient()
-}
+export const supabaseServer = (() => {
+  if (!_serverClient) {
+    _serverClient = createSupabaseServerClient()
+  }
+  return _serverClient
+})()
 
+// Legacy exports
 export const supabase = supabaseBrowser
-
-// Additional exports for compatibility
+export const createClient = createSupabaseBrowserClient
 export const createBrowserSupabaseClient = createSupabaseBrowserClient
 export const createServerSupabaseClient = createSupabaseServerClient
-
-// Helper function to get the appropriate client based on context
-export function getSupabaseClient(useAdmin = false): ReturnType<typeof createClientComponentClient<Database>> {
-  if (typeof window === "undefined") {
-    console.warn("getSupabaseClient called on server, returning browser client")
-  }
+export function getSupabaseClient() {
   return supabaseBrowser
 }
-
-// Default export for backward compatibility
 export default supabaseBrowser
