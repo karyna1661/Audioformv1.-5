@@ -1,6 +1,6 @@
-import { supabaseBrowser } from "@/lib/supabaseClient"
+"use client"
 
-export const createClient = () => {
-  // Simply return our shared browser client
-  return supabaseBrowser
-}
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/database.types"
+
+export const createClient = () => createClientComponentClient<Database>()

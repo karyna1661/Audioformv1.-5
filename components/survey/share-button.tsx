@@ -72,3 +72,6 @@ export function ShareButton({ surveyId, surveyTitle, className }: ShareButtonPro
     </div>
   )
 }
+
+// Default export for backward compatibility
+export default ShareButton

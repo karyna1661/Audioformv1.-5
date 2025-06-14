@@ -1,4 +1,4 @@
-import { createClient } from "./client"
+import { supabase } from "@/lib/supabase/client"
 
 /**
  * Uploads an audio file to the Supabase storage
@@ -7,9 +7,6 @@ import { createClient } from "./client"
  * @returns The public URL of the uploaded file
  */
 export async function uploadAudio(file: File, path: string): Promise<string> {
-  const supabase = createClient()
-
-  // Upload the file to the demo-audio bucket (ensure correct bucket name)
   const { data, error } = await supabase.storage.from("demo-audio").upload(path, file, {
     cacheControl: "3600",
     upsert: true, // Allow overwriting existing files
@@ -31,8 +28,6 @@ export async function uploadAudio(file: File, path: string): Promise<string> {
  * @param path The path of the file to delete
  */
 export async function deleteAudio(path: string): Promise<void> {
-  const supabase = createClient()
-
   const { error } = await supabase.storage.from("demo-audio").remove([path])
 
   if (error) {
@@ -47,8 +42,6 @@ export async function deleteAudio(path: string): Promise<void> {
  * @returns Array of file objects
  */
 export async function listAudioFiles(directory: string) {
-  const supabase = createClient()
-
   const { data, error } = await supabase.storage.from("demo-audio").list(directory)
 
   if (error) {
@@ -57,4 +50,47 @@ export async function listAudioFiles(directory: string) {
   }
 
   return data
+}
+
+// Additional storage utilities
+export const uploadFile = async (file: File, path: string) => {
+  try {
+    const { data, error } = await supabase.storage.from("demo-audio").upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+    })
+    if (error) {
+      console.error("Error uploading file:", error)
+      return { data: null, error: error.message }
+    }
+    return { data, error: null }
+  } catch (error: any) {
+    console.error("Unexpected error uploading file:", error)
+    return { data: null, error: error.message }
+  }
+}
+
+export const getFileUrl = async (path: string) => {
+  try {
+    const { data } = supabase.storage.from("demo-audio").getPublicUrl(path)
+    return data.publicUrl
+  } catch (error: any) {
+    console.error("Error getting public url:", error)
+    return null
+  }
+}
+
+export const deleteFile = async (path: string) => {
+  try {
+    const { error } = await supabase.storage.from("demo-audio").remove([path])
+
+    if (error) {
+      console.error("Error deleting file:", error)
+      return { error: error.message }
+    }
+    return { error: null }
+  } catch (error: any) {
+    console.error("Unexpected error deleting file:", error)
+    return { error: error.message }
+  }
 }

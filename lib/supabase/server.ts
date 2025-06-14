@@ -1,10 +1,10 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 
-export function getServerSupabase() {
-  return createServerComponentClient<Database>({ cookies })
-}
+export const supabaseServer = createClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+)
 
-// Export a singleton instance for convenience
-export const supabaseServer = createServerComponentClient<Database>({ cookies })
+// Add the missing export for backward compatibility
+export const createSupabaseServerClient = () => supabaseServer

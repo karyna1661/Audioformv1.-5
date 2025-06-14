@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { supabaseBrowser } from "@/lib/supabaseClient"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/database.types"
 
 export const createClient = (request: NextRequest) => {
   // Create an unmodified response
@@ -9,7 +10,8 @@ export const createClient = (request: NextRequest) => {
     },
   })
 
-  // This is a simplified version that uses our shared client
-  // In a real implementation, you might want to create a new client with the cookies
-  return { supabase: supabaseBrowser, response }
+  // Create a Supabase client for middleware
+  const supabase = createClientComponentClient<Database>()
+
+  return { supabase, response }
 }

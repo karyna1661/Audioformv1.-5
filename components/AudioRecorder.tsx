@@ -94,8 +94,10 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
       const filePath = `audio-responses/${uuidv4()}.webm`
 
       // Upload to Supabase Storage
-      const { data, error } = await supabase.storage.from("audio-responses").upload(filePath, audioBlob, {
+      const { data, error } = await supabase.storage.from("demo-audio").upload(filePath, audioBlob, {
         contentType: "audio/webm",
+        cacheControl: "3600",
+        upsert: true,
       })
 
       if (error) {
@@ -106,7 +108,7 @@ export function AudioRecorder({ onSubmit, isLoading }: AudioRecorderProps) {
       }
 
       // Get public URL
-      const { data: urlData } = supabase.storage.from("audio-responses").getPublicUrl(filePath)
+      const { data: urlData } = supabase.storage.from("demo-audio").getPublicUrl(filePath)
       const publicUrl = urlData.publicUrl
 
       // Call parent callback with the URL

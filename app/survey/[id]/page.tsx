@@ -1,7 +1,7 @@
 // Force dynamic rendering for proper server-side data fetching
 export const dynamic = "force-dynamic"
 
-import { createSupabaseServerClient } from "@/lib/supabaseClient"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
