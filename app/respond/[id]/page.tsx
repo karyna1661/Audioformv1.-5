@@ -3,11 +3,14 @@ import { supabaseServer } from "@/lib/supabase/server"
 import type { Database } from "@/types/database.types"
 import ResponseForm from "@/components/ResponseForm"
 import { notFound } from "next/navigation"
+import { ErrorBoundary } from "@/components/error-boundary"
+import { generateFrameMetadata } from "@/lib/farcaster/guidelines"
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"]
 
 interface Props {
   params: { id: string }
+  searchParams: { frame?: string; fid?: string; castId?: string }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -19,22 +22,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
-  const frameMetadata = {
-    "fc:frame": JSON.stringify({
-      version: "next",
-      imageUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/og.png`,
-      button: {
-        title: "Respond",
-        action: {
-          type: "launch_frame",
-          url: `${process.env.NEXT_PUBLIC_SITE_URL}/respond/${params.id}?miniApp=true`,
-          name: "Audioform",
-          splashImageUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/logo.png`,
-          splashBackgroundColor: "#000",
-        },
-      },
-    }),
-  }
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://voxera.vercel.app"
+
+  // Generate proper Farcaster frame metadata
+  const frameMetadata = generateFrameMetadata({
+    title: survey.title,
+    image: `${baseUrl}/api/frames/survey/${params.id}/image`,
+    buttons: [{ text: "🎤 Record Response", action: "post" }],
+    postUrl: `${baseUrl}/api/frames/survey/${params.id}`,
+  })
 
   return {
     title: `${survey.title} - Audioform`,
@@ -42,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: survey.title,
       description: survey.description || "Share your voice",
-      images: [`${process.env.NEXT_PUBLIC_SITE_URL}/og.png`],
+      images: [`${baseUrl}/api/frames/survey/${params.id}/image`],
     },
     other: frameMetadata,
   }
@@ -67,8 +63,9 @@ async function getSurvey(id: string): Promise<Survey | null> {
   }
 }
 
-export default async function RespondPage({ params }: Props) {
+export default async function RespondPage({ params, searchParams }: Props) {
   const survey = await getSurvey(params.id)
+  const isFrame = searchParams.frame === "true"
 
   if (!survey) {
     return notFound()
@@ -115,26 +112,32 @@ export default async function RespondPage({ params }: Props) {
   const questionText = typeof firstQuestion === "string" ? firstQuestion : firstQuestion?.text || firstQuestion?.prompt
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{survey.title}</h1>
-            {survey.description && <p className="text-gray-600">{survey.description}</p>}
-          </div>
+    <ErrorBoundary>
+      <div className={`min-h-screen ${isFrame ? "bg-white" : "bg-gray-50"}`}>
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-2xl mx-auto">
+            {/* Header - hide in frame mode */}
+            {!isFrame && (
+              <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">{survey.title}</h1>
+                {survey.description && <p className="text-gray-600">{survey.description}</p>}
+              </div>
+            )}
 
-          {/* Response Form */}
-          <ResponseForm
-            surveyId={survey.id}
-            question={questionText}
-            onComplete={() => {
-              // Handle completion - could redirect or show thank you
-              window.location.href = "/"
-            }}
-          />
+            {/* Response Form */}
+            <ResponseForm
+              surveyId={survey.id}
+              question={questionText}
+              isFrame={isFrame}
+              onComplete={() => {
+                if (!isFrame && typeof window !== "undefined") {
+                  window.location.href = "/"
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   )
 }
