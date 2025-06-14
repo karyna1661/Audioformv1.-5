@@ -97,7 +97,7 @@ importers:
         version: 11.1.0
       zod:
         specifier: latest
-        version: 3.25.63
+        version: 3.25.64
       zustand:
         specifier: ^4.5.2
         version: 4.5.2(@types/react@18.0.0)(react@18.0.0)
@@ -2531,8 +2531,8 @@ packages:
     engines: {node: '>= 14.6'}
     hasBin: true
 
-  zod@3.25.63:
-    resolution: {integrity: sha512-3ttCkqhtpncYXfP0f6dsyabbYV/nEUW+Xlu89jiXbTBifUfjaSqXOG6JnQPLtqt87n7KAmnMqcjay6c0Wq0Vbw==}
+  zod@3.25.64:
+    resolution: {integrity: sha512-hbP9FpSZf7pkS7hRVUrOjhwKJNyampPgtXKc3AN6DsWtoHsg2Sb4SQaS4Tcay380zSwd2VPo9G9180emBACp5g==}
 
   zustand@4.5.2:
     resolution: {integrity: sha512-2cN1tPkDVkwCy5ickKrI7vijSjPksFRfqS6237NzT0vqSsztTNnQdHw9mmN7uBdk3gceVXU0a+21jFzFzAc9+g==}
@@ -5245,7 +5245,7 @@ snapshots:
 
   yaml@2.8.0: {}
 
-  zod@3.25.63: {}
+  zod@3.25.64: {}
 
   zustand@4.5.2(@types/react@18.0.0)(react@18.0.0):
     dependencies:
