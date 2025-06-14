@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import type { Database } from "@/types/supabase"
+import type { Database } from "@/types/database.types"
 import { AudioRecorder } from "@/components/AudioRecorder"
 import { ThankYouModal } from "@/components/ThankYouModal"
 import { Button } from "@/components/ui/button"

@@ -1,76 +1,70 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/supabase"
+import { createClientComponentClient, createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
+import type { Database } from "@/types/database.types"
 
-// Get environment variables
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Shared constants
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Validate required environment variables
-if (!SUPABASE_URL) {
-  throw new Error("NEXT_PUBLIC_SUPABASE_URL is required. Please check your environment variables.")
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error("Missing Supabase environment variables")
 }
 
-if (!SUPABASE_ANON_KEY) {
-  throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required. Please check your environment variables.")
-}
-
-// Common options for both clients
-const commonOptions = {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: false,
-  },
-  telemetry: false,
-}
-
-// Public (browser) client — only anon key
-export const supabaseBrowser: SupabaseClient<Database> = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  ...commonOptions,
-  auth: {
-    ...commonOptions.auth,
-    persistSession: true, // Enable session persistence for browser client
-  },
-})
-
-// Server (service‑role) client — only created if the key is available
-let _supabaseServer: SupabaseClient<Database> | null = null
-
-// Function to get the server client, with lazy initialization
-export function getSupabaseServer(): SupabaseClient<Database> {
-  // Only create the server client if we're in a server context and have the key
-  if (typeof window === "undefined" && SUPABASE_SERVICE_ROLE_KEY) {
-    if (!_supabaseServer) {
-      _supabaseServer = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        ...commonOptions,
-        auth: {
-          ...commonOptions.auth,
-          persistSession: false, // Disable session persistence for server client
-        },
-      })
-    }
-    return _supabaseServer
+// Client-side usage
+export function createSupabaseBrowserClient() {
+  if (typeof window === "undefined") {
+    throw new Error("createSupabaseBrowserClient called on server")
   }
 
-  // If we're on the client side or don't have the service role key, use the browser client
-  console.warn(
-    "Attempted to use supabaseServer in a client context or without a service role key. Falling back to supabaseBrowser.",
-  )
-  return supabaseBrowser
+  return createClientComponentClient<Database>()
 }
 
-// For backward compatibility and convenience
-export const supabaseServer =
-  typeof window === "undefined" && SUPABASE_SERVICE_ROLE_KEY ? getSupabaseServer() : supabaseBrowser
+// Server-side usage (API routes, server components, etc.)
+export function createSupabaseServerClient() {
+  return createServerComponentClient<Database>({ cookies })
+}
 
-// For backward compatibility
+// Create browser client instance
+export const supabaseBrowser = (() => {
+  if (typeof window !== "undefined") {
+    return createClientComponentClient<Database>()
+  }
+  // Return a dummy object for server-side to prevent crashes
+  return {} as ReturnType<typeof createClientComponentClient<Database>>
+})()
+
+// Create server client instance (only use in server context)
+export const supabaseServer = (() => {
+  if (typeof window === "undefined") {
+    try {
+      return createServerComponentClient<Database>({ cookies })
+    } catch {
+      // Fallback for build time or when cookies aren't available
+      return {} as ReturnType<typeof createServerComponentClient<Database>>
+    }
+  }
+  return {} as ReturnType<typeof createServerComponentClient<Database>>
+})()
+
+// Legacy exports for backward compatibility
+export function createClient() {
+  console.warn("createClient() is deprecated. Use createSupabaseBrowserClient() instead.")
+  return createSupabaseBrowserClient()
+}
+
 export const supabase = supabaseBrowser
 
+// Additional exports for compatibility
+export const createBrowserSupabaseClient = createSupabaseBrowserClient
+export const createServerSupabaseClient = createSupabaseServerClient
+
 // Helper function to get the appropriate client based on context
-export function getSupabaseClient(useAdmin = false): SupabaseClient<Database> {
-  // Only use the admin client server-side when explicitly requested
-  if (useAdmin && typeof window === "undefined" && SUPABASE_SERVICE_ROLE_KEY) {
-    return getSupabaseServer()
+export function getSupabaseClient(useAdmin = false): ReturnType<typeof createClientComponentClient<Database>> {
+  if (typeof window === "undefined") {
+    console.warn("getSupabaseClient called on server, returning browser client")
   }
   return supabaseBrowser
 }
+
+// Default export for backward compatibility
+export default supabaseBrowser
