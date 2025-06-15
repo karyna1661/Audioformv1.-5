@@ -8,9 +8,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Label } from "@/components/ui/label"
 import { Plus, Trash2, ArrowLeft, Save } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
+import { supabase } from "@/lib/supabase/client"
 
-// Define the question type
 interface Question {
   id: string
   text: string
@@ -19,16 +19,11 @@ interface Question {
 export default function NewSurvey() {
   const router = useRouter()
   const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
   const [questions, setQuestions] = useState<Question[]>([{ id: "1", text: "" }])
   const [isSaving, setIsSaving] = useState(false)
 
-  // For free tier, limit to 5 questions
-  const userTier = "free" // This would come from user context in a real app
-  const maxQuestions = userTier === "free" ? 5 : 100
-
   const handleAddQuestion = () => {
-    if (questions.length >= maxQuestions) return
-
     const newId = (questions.length + 1).toString()
     setQuestions([...questions, { id: newId, text: "" }])
   }
@@ -47,27 +42,42 @@ export default function NewSurvey() {
 
     // Validate form
     if (!title.trim()) {
-      alert("Please enter a survey title")
+      toast.error("Please enter a survey title")
       setIsSaving(false)
       return
     }
 
     if (questions.some((q) => !q.text.trim())) {
-      alert("Please fill in all questions")
+      toast.error("Please fill in all questions")
       setIsSaving(false)
       return
     }
 
-    // In a real app, this would be an API call
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Create survey in database
+      const { data: survey, error } = await supabase
+        .from("surveys")
+        .insert({
+          title: title.trim(),
+          description: description.trim() || null,
+          questions: questions.map((q) => ({ id: q.id, text: q.text.trim() })),
+          is_active: true,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
 
-      // Redirect to dashboard on success
-      router.push("/dashboard")
+      if (error) {
+        console.error("Error creating survey:", error)
+        toast.error("Failed to create survey. Please try again.")
+        return
+      }
+
+      toast.success("Survey created successfully!")
+      router.push(`/surveys/${survey.id}`)
     } catch (error) {
-      console.error("Error saving survey:", error)
-      alert("Failed to save survey. Please try again.")
+      console.error("Error creating survey:", error)
+      toast.error("Failed to create survey. Please try again.")
     } finally {
       setIsSaving(false)
     }
@@ -89,10 +99,9 @@ export default function NewSurvey() {
           <h1 className="text-3xl font-bold">Create New Survey</h1>
           <p className="text-muted-foreground">Design your voice-first survey</p>
         </div>
-        <Badge variant="outline">{userTier.charAt(0).toUpperCase() + userTier.slice(1)} Tier</Badge>
       </div>
 
-      <div className="grid gap-8">
+      <div className="grid gap-8 max-w-4xl">
         <Card>
           <CardHeader>
             <CardTitle>Survey Details</CardTitle>
@@ -100,12 +109,22 @@ export default function NewSurvey() {
           <CardContent>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Survey Title</Label>
+                <Label htmlFor="title">Survey Title *</Label>
                 <Input
                   id="title"
                   placeholder="Enter survey title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe what this survey is about"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
                 />
               </div>
             </div>
@@ -121,7 +140,7 @@ export default function NewSurvey() {
               {questions.map((question, index) => (
                 <div key={question.id} className="space-y-2 p-4 border rounded-lg">
                   <div className="flex justify-between items-center">
-                    <Label htmlFor={`question-${question.id}`}>Question {index + 1}</Label>
+                    <Label htmlFor={`question-${question.id}`}>Question {index + 1} *</Label>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -136,29 +155,15 @@ export default function NewSurvey() {
                     placeholder="Enter your question"
                     value={question.text}
                     onChange={(e) => handleQuestionChange(question.id, e.target.value)}
+                    rows={2}
                   />
                 </div>
               ))}
 
-              <Button
-                variant="outline"
-                onClick={handleAddQuestion}
-                disabled={questions.length >= maxQuestions}
-                className="w-full"
-              >
+              <Button variant="outline" onClick={handleAddQuestion} className="w-full">
                 <Plus className="mr-2 h-4 w-4" />
-                Add Question {userTier === "free" && `(${questions.length}/${maxQuestions})`}
+                Add Question
               </Button>
-
-              {userTier === "free" && questions.length >= maxQuestions && (
-                <p className="text-sm text-muted-foreground text-center">
-                  You've reached the maximum number of questions for the Free tier.
-                  <br />
-                  <a href="/pricing" className="text-blue-600 hover:underline">
-                    Upgrade to Pro for unlimited questions
-                  </a>
-                </p>
-              )}
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
@@ -171,7 +176,7 @@ export default function NewSurvey() {
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Survey
+                  Create Survey
                 </>
               )}
             </Button>
