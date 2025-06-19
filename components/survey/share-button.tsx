@@ -2,8 +2,9 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check } from "lucide-react"
 import { toast } from "sonner"
+import { createResponseUrl } from "@/lib/utils/url"
 
 interface ShareButtonProps {
   surveyId: string
@@ -15,11 +16,10 @@ export function ShareButton({ surveyId, surveyTitle, className }: ShareButtonPro
   const [copied, setCopied] = useState(false)
 
   const handleShare = async () => {
-    // Use the correct domain
-    const baseUrl = "https://voxera.vercel.app"
-    const shareUrl = `${baseUrl}/respond/${surveyId.trim()}`
+    // Use the centralized URL utility
+    const shareUrl = createResponseUrl(surveyId)
 
-    console.log("Sharing URL:", shareUrl) // Debug log
+    console.log("Generated share URL:", shareUrl) // Debug log
 
     try {
       await navigator.clipboard.writeText(shareUrl)
@@ -34,8 +34,8 @@ export function ShareButton({ surveyId, surveyTitle, className }: ShareButtonPro
   }
 
   return (
-    <Button 
-      onClick={handleShare} 
+    <Button
+      onClick={handleShare}
       className={`bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white ${className}`}
     >
       {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
