@@ -1,52 +1,67 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
-import { Button, useToast } from "@chakra-ui/react"
-import { CopyIcon, ExternalLinkIcon } from "@chakra-ui/icons"
-import { createSurveyUrl } from "../../utils/url" // Updated import
-import { useFarcasterShare } from "../../hooks/useFarcasterShare"
+import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Share2, Copy, MessageCircle } from "lucide-react"
+import { toast } from "sonner"
+import { createSurveyUrl } from "@/lib/utils/url"
+import { useFarcasterShare } from "@/hooks/useFarcasterShare"
 
 interface ShareButtonProps {
   surveyId: string
+  surveyTitle?: string
 }
 
-const ShareButton: React.FC<ShareButtonProps> = ({ surveyId }) => {
-  const [isCopied, setIsCopied] = useState(false)
-  const toast = useToast()
-  const { shareToFarcaster } = useFarcasterShare()
+export function ShareButton({ surveyId, surveyTitle = "Check out this survey" }: ShareButtonProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const { shareToFarcaster, isSharing } = useFarcasterShare()
 
-  const handleCopyLink = () => {
-    const surveyUrl = createSurveyUrl(surveyId) // Updated sharing logic
-    navigator.clipboard.writeText(surveyUrl)
-    setIsCopied(true)
-    toast({
-      title: "Link copied to clipboard!",
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-    })
+  const surveyUrl = createSurveyUrl(surveyId)
 
-    setTimeout(() => {
-      setIsCopied(false)
-    }, 3000)
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(surveyUrl)
+      toast.success("Survey link copied to clipboard!")
+      setIsOpen(false)
+    } catch (error) {
+      console.error("Failed to copy to clipboard:", error)
+      toast.error("Failed to copy link")
+    }
   }
 
   const handleFarcasterShare = async () => {
-    const surveyUrl = createSurveyUrl(surveyId) // Updated Farcaster sharing
-    await shareToFarcaster(surveyUrl)
+    const result = await shareToFarcaster({
+      text: `${surveyTitle} - Share your thoughts!`,
+      url: surveyUrl,
+    })
+
+    if (result.success) {
+      toast.success("Opening Farcaster...")
+      setIsOpen(false)
+    } else {
+      toast.error("Failed to share to Farcaster")
+    }
   }
 
   return (
-    <>
-      <Button leftIcon={<CopyIcon />} onClick={handleCopyLink} isLoading={isCopied} loadingText="Copied!" mr={2}>
-        {isCopied ? "Copied!" : "Copy Link"}
-      </Button>
-      <Button leftIcon={<ExternalLinkIcon />} onClick={handleFarcasterShare}>
-        Share to Farcaster
-      </Button>
-    </>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Share2 className="h-4 w-4 mr-2" />
+          Share Survey
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={copyToClipboard}>
+          <Copy className="h-4 w-4 mr-2" />
+          Copy Link
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleFarcasterShare} disabled={isSharing}>
+          <MessageCircle className="h-4 w-4 mr-2" />
+          {isSharing ? "Sharing..." : "Share on Farcaster"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
-
-export default ShareButton
