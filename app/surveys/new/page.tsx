@@ -54,13 +54,20 @@ export default function NewSurvey() {
     }
 
     try {
+      // Prepare questions data
+      const questionsData = questions.map((q, index) => ({
+        id: q.id,
+        text: q.text.trim(),
+        order: index + 1,
+      }))
+
       // Create survey in database
       const { data: survey, error } = await supabase
         .from("surveys")
         .insert({
           title: title.trim(),
           description: description.trim() || null,
-          questions: questions.map((q) => ({ id: q.id, text: q.text.trim() })),
+          questions: questionsData,
           is_active: true,
           created_at: new Date().toISOString(),
         })

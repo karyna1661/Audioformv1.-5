@@ -30,8 +30,9 @@ export default async function SurveyPage({ params }: { params: { id: string } })
     }
 
     const survey: SurveyData = data
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    const responseUrl = `${baseUrl}/respond/${survey.id}`
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://voxera.vercel.app"
+    const cleanBaseUrl = baseUrl.trim().replace(/\/$/, "")
+    const responseUrl = `${cleanBaseUrl}/respond/${survey.id}`
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
@@ -42,7 +43,7 @@ export default async function SurveyPage({ params }: { params: { id: string } })
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">{survey.title}</h1>
                 {survey.description && <p className="text-gray-600 mb-6">{survey.description}</p>}
                 <p className="text-gray-500 text-sm">
-                  {Array.isArray(survey.questions) ? survey.questions.length : 0} question
+                  {Array.isArray(survey.questions) ? survey.questions.length : 1} question
                   {Array.isArray(survey.questions) && survey.questions.length !== 1 ? "s" : ""}
                 </p>
               </div>

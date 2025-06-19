@@ -15,8 +15,14 @@ export function ShareButton({ surveyId, surveyTitle, className }: ShareButtonPro
   const [copied, setCopied] = useState(false)
 
   const handleShare = async () => {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
-    const shareUrl = `${baseUrl}/respond/${surveyId}`
+    // Get the base URL from environment or current window
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "")
+
+    // Clean the base URL and create the share URL
+    const cleanBaseUrl = baseUrl.trim().replace(/\/$/, "")
+    const shareUrl = `${cleanBaseUrl}/respond/${surveyId.trim()}`
+
+    console.log("Sharing URL:", shareUrl) // Debug log
 
     try {
       await navigator.clipboard.writeText(shareUrl)
