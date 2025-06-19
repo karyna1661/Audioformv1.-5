@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
 import { AudioRecorder } from "@/components/AudioRecorder"
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Database } from "@/types/database.types"
 
@@ -28,10 +28,18 @@ export default function RespondPage({ params: { id } }: Props) {
   const [responses, setResponses] = useState<{ [key: number]: Blob }>({})
   const [responseCount, setResponseCount] = useState(0)
 
+  // Debug logging
+  useEffect(() => {
+    console.log("RespondPage mounted with ID:", id)
+    console.log("Current URL:", window.location.href)
+  }, [id])
+
   useEffect(() => {
     async function loadSurvey() {
       try {
         setLoading(true)
+        console.log("Loading survey with ID:", id)
+
         const { data, error } = await supabase
           .from("surveys")
           .select(`
@@ -41,8 +49,16 @@ export default function RespondPage({ params: { id } }: Props) {
           .eq("id", id)
           .single()
 
-        if (error || !data) {
-          throw error || new Error("Survey not found")
+        console.log("Survey query result:", { data, error })
+
+        if (error) {
+          console.error("Survey query error:", error)
+          throw error
+        }
+
+        if (!data) {
+          console.error("No survey data found")
+          throw new Error("Survey not found")
         }
 
         // Check if survey is active
@@ -61,12 +77,19 @@ export default function RespondPage({ params: { id } }: Props) {
         setResponseCount(data.responses?.length || 0)
 
         // Parse questions - handle both string and object formats
-        const parsedQuestions = Array.isArray(data.questions)
-          ? data.questions
-          : typeof data.questions === "string"
-            ? [{ text: data.questions }]
-            : [{ text: data.questions || "Please record your response" }]
+        let parsedQuestions: any[] = []
 
+        if (Array.isArray(data.questions)) {
+          parsedQuestions = data.questions
+        } else if (typeof data.questions === "string") {
+          parsedQuestions = [{ text: data.questions }]
+        } else if (data.questions && typeof data.questions === "object") {
+          parsedQuestions = [{ text: data.questions.text || "Please record your response" }]
+        } else {
+          parsedQuestions = [{ text: "Please record your response" }]
+        }
+
+        console.log("Parsed questions:", parsedQuestions)
         setQuestions(parsedQuestions)
       } catch (err) {
         console.error("Survey load error:", err)
@@ -97,7 +120,7 @@ export default function RespondPage({ params: { id } }: Props) {
         },
         () => {
           setResponseCount((prev) => prev + 1)
-        }
+        },
       )
       .subscribe()
 
@@ -106,7 +129,8 @@ export default function RespondPage({ params: { id } }: Props) {
     }
   }, [id])
 
-  const handleRecordingComplete = (audioBlob: Blob) => {
+  const handleRecordingComplete = (audioBlob: Blob, duration: number) => {
+    console.log("Recording complete:", { audioBlob, duration })
     setResponses((prev) => ({ ...prev, [currentIndex]: audioBlob }))
   }
 
@@ -124,6 +148,8 @@ export default function RespondPage({ params: { id } }: Props) {
 
   const handleSubmit = async () => {
     try {
+      console.log("Submitting responses:", responses)
+
       // Submit all responses
       for (const [questionIndex, audioBlob] of Object.entries(responses)) {
         const file = new File([audioBlob], `response-${id}-${questionIndex}.webm`, {
@@ -139,11 +165,15 @@ export default function RespondPage({ params: { id } }: Props) {
           continue
         }
 
-        await supabase.from("responses").insert({
+        const { error: insertError } = await supabase.from("responses").insert({
           survey_id: id,
           audio_path: uploadData.path,
           question_index: Number.parseInt(questionIndex),
         })
+
+        if (insertError) {
+          console.error("Insert error:", insertError)
+        }
       }
 
       // Show success message and redirect
@@ -161,6 +191,7 @@ export default function RespondPage({ params: { id } }: Props) {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading survey...</p>
+          <p className="text-xs text-gray-400 mt-2">Survey ID: {id}</p>
         </div>
       </div>
     )
@@ -171,7 +202,8 @@ export default function RespondPage({ params: { id } }: Props) {
       <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Survey Unavailable</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-xs text-gray-400 mb-6">Survey ID: {id}</p>
           <Button
             onClick={() => router.push("/")}
             className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
@@ -188,6 +220,7 @@ export default function RespondPage({ params: { id } }: Props) {
       <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
         <div className="text-center">
           <p className="text-gray-600">Survey not found</p>
+          <p className="text-xs text-gray-400 mt-2">Survey ID: {id}</p>
           <Button
             onClick={() => router.push("/")}
             className="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
@@ -208,6 +241,17 @@ export default function RespondPage({ params: { id } }: Props) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-md mx-auto p-4">
+        {/* Debug Info */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-xs">
+          <p>
+            <strong>Debug Info:</strong>
+          </p>
+          <p>Survey ID: {id}</p>
+          <p>Survey Title: {survey.title}</p>
+          <p>Questions: {questions.length}</p>
+          <p>Current Question: {currentIndex + 1}</p>
+        </div>
+
         {/* Survey Header */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{survey.title}</h1>
@@ -246,11 +290,7 @@ export default function RespondPage({ params: { id } }: Props) {
                   <div
                     key={index}
                     className={`w-2 h-2 rounded-full ${
-                      index === currentIndex 
-                        ? "bg-indigo-600" 
-                        : index < currentIndex 
-                          ? "bg-green-500" 
-                          : "bg-gray-300"
+                      index === currentIndex ? "bg-indigo-600" : index < currentIndex ? "bg-green-500" : "bg-gray-300"
                     }`}
                   />
                 ))}
@@ -265,9 +305,9 @@ export default function RespondPage({ params: { id } }: Props) {
 
           {/* Audio Recorder - Key prop forces re-render on question change */}
           <div className="mb-6">
-            <AudioRecorder 
+            <AudioRecorder
               key={currentIndex} // This forces component re-render
-              onRecordingComplete={handleRecordingComplete} 
+              onRecordingComplete={handleRecordingComplete}
               existingRecording={responses[currentIndex]}
               questionIndex={currentIndex}
             />
