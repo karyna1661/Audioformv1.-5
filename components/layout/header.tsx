@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import {
@@ -15,7 +14,24 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { CheckCircle } from "lucide-react"
+import { CheckCircle, Mic } from "lucide-react"
+import { theme } from "@/lib/theme/colors"
+
+// Custom Microphone with Waveform Icon Component
+function MicrophoneWaveIcon({ className }: { className?: string }) {
+  return (
+    <div className={`relative ${className}`}>
+      <Mic className="h-5 w-5 text-white relative z-10" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex space-x-0.5 opacity-60">
+          <div className="w-0.5 h-1.5 bg-white rounded-full animate-pulse" style={{ animationDelay: "0ms" }}></div>
+          <div className="w-0.5 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: "150ms" }}></div>
+          <div className="w-0.5 h-1 bg-white rounded-full animate-pulse" style={{ animationDelay: "300ms" }}></div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function Header() {
   const { toast } = useToast()
@@ -68,22 +84,30 @@ export function Header() {
   }
 
   return (
-    <header className="border-b">
+    <header className="border-b border-indigo-100">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <Link href="/" className="flex items-center">
-          <Image
-            src="/images/audioform-logo.png"
-            alt="Audioform Logo"
-            width={180}
-            height={50}
-            className="h-10 w-auto"
-          />
+        <Link href="/" className="flex items-center gap-3">
+          <div
+            className={`w-10 h-10 ${theme.primary.gradient} rounded-xl flex items-center justify-center shadow-lg relative overflow-hidden`}
+          >
+            <MicrophoneWaveIcon />
+          </div>
+          <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            Audioform
+          </span>
         </Link>
         <div className="flex items-center space-x-4">
           <Link href="/demo">
-            <Button variant="outline">Try Demo</Button>
+            <Button
+              variant="outline"
+              className={`${theme.primary.border} ${theme.primary.text} hover:${theme.primary.bg}`}
+            >
+              Try Demo
+            </Button>
           </Link>
-          <Button onClick={() => setShowWaitlistModal(true)}>Join Waitlist</Button>
+          <Button onClick={() => setShowWaitlistModal(true)} className={theme.primary.gradient}>
+            Join Waitlist
+          </Button>
         </div>
       </div>
 
@@ -115,7 +139,7 @@ export function Header() {
                 <Button variant="outline" onClick={() => setShowWaitlistModal(false)} disabled={isSubmitting}>
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                <Button onClick={handleSubmit} disabled={isSubmitting} className={theme.primary.gradient}>
                   {isSubmitting ? "Submitting..." : "Join Waitlist"}
                 </Button>
               </DialogFooter>
@@ -128,7 +152,9 @@ export function Header() {
                 We'll notify you at <span className="font-medium">{email}</span> when we launch.
               </DialogDescription>
               <p className="text-xs text-gray-500">© 2025 Audioform. All rights reserved.</p>
-              <Button onClick={() => setShowWaitlistModal(false)}>Close</Button>
+              <Button onClick={() => setShowWaitlistModal(false)} className={theme.primary.gradient}>
+                Close
+              </Button>
             </div>
           )}
         </DialogContent>

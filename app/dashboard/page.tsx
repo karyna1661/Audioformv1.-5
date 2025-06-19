@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, BarChart3, Users, Mic } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { SurveyCard } from "@/components/survey/survey-card"
 import { supabase } from "@/lib/supabase/client"
+import { ThemedButton } from "@/components/ui/themed-button"
 
 interface Survey {
   id: string
@@ -124,16 +124,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Manage your voice surveys</p>
         </div>
-        <Button onClick={() => router.push("/surveys/new")} className="bg-gradient-to-r from-indigo-500 to-purple-600">
+        <ThemedButton onClick={() => router.push("/surveys/new")}>
           <Plus className="mr-2 h-4 w-4" />
           Create Survey
-        </Button>
+        </ThemedButton>
       </div>
 
       {/* Stats Cards */}
@@ -184,10 +184,10 @@ export default function Dashboard() {
               <Mic className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No surveys yet</h3>
               <p className="text-gray-600 mb-6">Create your first voice survey to get started</p>
-              <Button onClick={() => router.push("/surveys/new")}>
+              <ThemedButton onClick={() => router.push("/surveys/new")}>
                 <Plus className="mr-2 h-4 w-4" />
                 Create Your First Survey
-              </Button>
+              </ThemedButton>
             </CardContent>
           </Card>
         ) : (

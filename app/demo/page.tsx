@@ -1,269 +1,249 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase/client"
-import { z } from "zod"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Loader2, Plus, Trash2, Sparkles } from "lucide-react"
-import { toast } from "sonner"
-import Head from "next/head"
+import { Textarea } from "@/components/ui/textarea"
+import { Header } from "@/components/layout/header"
+import { Footer } from "@/components/layout/footer"
+import { Plus, Trash2, Play, Users, Clock, BarChart3 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
-const surveySchema = z.object({
-  title: z.string().min(1, "Title is required").max(200, "Title is too long"),
-  questions: z.array(z.string().min(1, "Question cannot be empty")).min(1, "At least one question is required"),
-  type: z.enum(["demo", "standard"]).default("demo"),
-})
+interface Question {
+  id: string
+  text: string
+}
 
-export default function CreateSurveyPage() {
+export default function DemoPage() {
   const router = useRouter()
-  const [title, setTitle] = useState("")
-  const [questions, setQuestions] = useState([""])
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-
-  const handleQuestionChange = (index: number, value: string) => {
-    const updatedQuestions = [...questions]
-    updatedQuestions[index] = value
-    setQuestions(updatedQuestions)
-  }
+  const [title, setTitle] = useState("Customer Feedback Survey")
+  const [questions, setQuestions] = useState<Question[]>([
+    { id: "1", text: "How would you rate your overall experience?" },
+    { id: "2", text: "What features do you find most valuable?" },
+    { id: "3", text: "How can we improve our service?" },
+  ])
+  const [isCreating, setIsCreating] = useState(false)
 
   const addQuestion = () => {
-    setQuestions([...questions, ""])
+    const newQuestion: Question = {
+      id: Date.now().toString(),
+      text: "",
+    }
+    setQuestions([...questions, newQuestion])
   }
 
-  const removeQuestion = (index: number) => {
+  const updateQuestion = (id: string, text: string) => {
+    setQuestions(questions.map((q) => (q.id === id ? { ...q, text } : q)))
+  }
+
+  const removeQuestion = (id: string) => {
     if (questions.length > 1) {
-      const updatedQuestions = questions.filter((_, i) => i !== index)
-      setQuestions(updatedQuestions)
+      setQuestions(questions.filter((q) => q.id !== id))
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
+  const createSurvey = async () => {
+    setIsCreating(true)
 
     try {
-      // Validate input
-      const validation = surveySchema.safeParse({ title, questions: questions.filter((q) => q.trim()) })
-      if (!validation.success) {
-        setError(validation.error.errors[0].message)
-        return
-      }
+      // Simulate survey creation
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Get user (optional for demo)
-      const { data: userData } = await supabase.auth.getUser()
-      const userId = userData?.user?.id ?? null
+      // Generate a demo survey ID
+      const demoId = `demo-${Date.now()}`
 
-      // Calculate expiry date (24 hours from now)
-      const expiresAt = new Date()
-      expiresAt.setHours(expiresAt.getHours() + 24)
-
-      // Format questions for database
-      const formattedQuestions = questions
-        .filter((q) => q.trim())
-        .map((question, index) => ({
-          id: (index + 1).toString(),
-          text: question.trim(),
-        }))
-
-      // Create survey
-      const { data, error: insertError } = await supabase
-        .from("surveys")
-        .insert([
-          {
-            title: title.trim(),
-            questions: formattedQuestions,
-            type: "demo",
-            user_id: userId,
-            expires_at: expiresAt.toISOString(),
-            is_active: true,
-          },
-        ])
-        .select()
-        .single()
-
-      if (insertError) {
-        console.error("Database error:", insertError)
-        setError("Failed to create survey. Please try again.")
-        return
-      }
-
-      if (!data) {
-        setError("Failed to create survey. No data returned.")
-        return
-      }
-
-      // Create demo session
-      try {
-        await supabase.from("demo_sessions").insert([
-          {
-            survey_id: data.id,
-            user_id: userId,
-            started_at: new Date().toISOString(),
-            expires_at: expiresAt.toISOString(),
-            notified: false,
-          },
-        ])
-      } catch (sessionError) {
-        console.error("Error creating demo session:", sessionError)
-        // Continue anyway since survey was created
-      }
-
-      toast.success("Survey created successfully!")
-      router.push(`/survey/${data.id}`)
-    } catch (err) {
-      console.error("Unexpected error:", err)
-      setError("An unexpected error occurred. Please try again.")
+      // Redirect to demo dashboard
+      router.push(`/demo/${demoId}`)
+    } catch (error) {
+      console.error("Error creating demo survey:", error)
     } finally {
-      setLoading(false)
+      setIsCreating(false)
     }
   }
 
   return (
-    <>
-      <Head>
-        <title>Create Demo Survey | Audioform</title>
-        <meta name="description" content="Create a voice survey demo in seconds" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-      </Head>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <Header />
 
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
-        <div className="px-4 py-8 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center mb-8 sm:mb-12">
-            <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-2 rounded-full border mb-4 sm:mb-6">
-              <Sparkles className="h-4 w-4 text-purple-600" />
-              <span className="text-sm font-medium text-purple-700">24-Hour Demo</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 sm:mb-4 leading-tight">
-              Create Your Voice Survey
-            </h1>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed px-2">
-              Build engaging audio surveys that capture authentic responses. Perfect for feedback, research, and
-              community engagement.
-            </p>
+      <main className="container mx-auto px-4 py-8">
+        {/* Hero Section */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full mb-6">
+            <Play className="w-8 h-8 text-white" />
           </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Create Your Demo Survey
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Experience the power of voice-first surveys. Create, customize, and launch your survey in minutes.
+          </p>
+        </div>
 
-          {/* Main Form */}
-          <div className="max-w-2xl mx-auto">
-            <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
-              <CardHeader className="pb-4 sm:pb-6">
-                <CardTitle className="text-xl sm:text-2xl text-center">Survey Details</CardTitle>
-              </CardHeader>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <Card className="border-indigo-100 bg-gradient-to-br from-indigo-50 to-white">
+            <CardContent className="p-6 text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 rounded-full mb-4">
+                <Users className="w-6 h-6 text-indigo-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-indigo-600 mb-2">10,000+</h3>
+              <p className="text-gray-600">Active Users</p>
+            </CardContent>
+          </Card>
 
-              <CardContent className="p-4 sm:p-6">
-                {error && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-600 text-sm">{error}</p>
-                  </div>
-                )}
+          <Card className="border-purple-100 bg-gradient-to-br from-purple-50 to-white">
+            <CardContent className="p-6 text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4">
+                <BarChart3 className="w-6 h-6 text-purple-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-purple-600 mb-2">95%</h3>
+              <p className="text-gray-600">Response Rate</p>
+            </CardContent>
+          </Card>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Survey Title */}
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm sm:text-base font-medium">
-                      Survey Title *
-                    </Label>
-                    <Input
-                      id="title"
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g., What's your favorite productivity tip?"
-                      className="h-11 sm:h-12 text-sm sm:text-base"
-                      required
-                    />
-                  </div>
+          <Card className="border-indigo-100 bg-gradient-to-br from-indigo-50 to-white">
+            <CardContent className="p-6 text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 rounded-full mb-4">
+                <Clock className="w-6 h-6 text-indigo-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-indigo-600 mb-2">2 min</h3>
+              <p className="text-gray-600">Setup Time</p>
+            </CardContent>
+          </Card>
+        </div>
 
-                  {/* Questions */}
-                  <div className="space-y-2">
-                    <Label className="text-sm sm:text-base font-medium">Questions *</Label>
-                    <div className="space-y-3">
-                      {questions.map((question, index) => (
-                        <div key={index} className="flex items-center gap-2">
+        {/* Survey Builder */}
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-gray-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-t-lg">
+              <CardTitle className="text-2xl">Survey Builder</CardTitle>
+              <CardDescription className="text-indigo-100">
+                Customize your survey title and questions below
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="p-8 space-y-8">
+              {/* Survey Title */}
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-lg font-semibold text-gray-700">
+                  Survey Title
+                </Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                  placeholder="Enter your survey title"
+                />
+              </div>
+
+              {/* Questions */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold text-gray-700">Questions ({questions.length})</Label>
+                  <Button
+                    onClick={addQuestion}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Question
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {questions.map((question, index) => (
+                    <Card key={question.id} className="border-gray-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-start space-x-4">
+                          <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                            {index + 1}
+                          </div>
                           <div className="flex-1">
-                            <Input
-                              type="text"
-                              value={question}
-                              onChange={(e) => handleQuestionChange(index, e.target.value)}
-                              placeholder={`Question ${index + 1}`}
-                              className="h-11 sm:h-12 text-sm sm:text-base"
-                              required
+                            <Textarea
+                              value={question.text}
+                              onChange={(e) => updateQuestion(question.id, e.target.value)}
+                              placeholder={`Enter question ${index + 1}...`}
+                              className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 resize-none"
+                              rows={2}
                             />
                           </div>
                           {questions.length > 1 && (
                             <Button
-                              type="button"
+                              onClick={() => removeQuestion(question.id)}
                               variant="outline"
                               size="sm"
-                              onClick={() => removeQuestion(index)}
-                              className="h-11 sm:h-12 px-3"
+                              className="text-red-600 border-red-300 hover:bg-red-50"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
                         </div>
-                      ))}
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={addQuestion}
-                      className="mt-2 text-blue-600 hover:text-blue-700"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Question
-                    </Button>
-                  </div>
-
-                  {/* Submit Button */}
-                  <Button
-                    type="submit"
-                    disabled={loading || !title.trim() || questions.every((q) => !q.trim())}
-                    className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                        Creating Survey...
-                      </>
-                    ) : (
-                      "Create Voice Survey"
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Info Card */}
-            <Card className="mt-6 bg-blue-50/80 backdrop-blur-sm border-blue-200">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-semibold text-blue-900 mb-1">Demo Survey Features</h3>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• Available for 24 hours</li>
-                      <li>• Voice responses from participants</li>
-                      <li>• Easy sharing on social media</li>
-                      <li>• No account required for respondents</li>
-                    </ul>
-                  </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+
+              {/* Create Button */}
+              <div className="pt-6 border-t border-gray-200">
+                <Button
+                  onClick={createSurvey}
+                  disabled={isCreating || !title.trim() || questions.some((q) => !q.text.trim())}
+                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-lg py-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  {isCreating ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                      Creating Survey...
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <Play className="w-5 h-5 mr-3" />
+                      Create Demo Survey
+                    </div>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Features Section */}
+        <div className="mt-16 text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8">Why Choose Voice Surveys?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="p-6">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full mb-4">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Higher Engagement</h3>
+              <p className="text-gray-600">
+                Voice responses feel more natural and personal, leading to higher completion rates.
+              </p>
+            </div>
+
+            <div className="p-6">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full mb-4">
+                <BarChart3 className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Rich Insights</h3>
+              <p className="text-gray-600">Capture emotion, tone, and nuance that text surveys miss.</p>
+            </div>
+
+            <div className="p-6">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full mb-4">
+                <Clock className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Quick Setup</h3>
+              <p className="text-gray-600">Create and launch surveys in minutes, not hours.</p>
+            </div>
           </div>
         </div>
-      </div>
-    </>
+      </main>
+
+      <Footer />
+    </div>
   )
 }

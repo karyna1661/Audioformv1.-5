@@ -5,48 +5,57 @@ import { Button } from "@/components/ui/button"
 import { Mic, Square, Play, Pause, RotateCcw } from "lucide-react"
 
 interface AudioRecorderProps {
-  onRecordingComplete?: (audioBlob: Blob) => void
+  onRecordingComplete: (audioBlob: Blob, duration: number) => void
   existingRecording?: Blob
-  surveyId?: string
   questionIndex?: number
 }
 
-export function AudioRecorder({ onRecordingComplete, existingRecording, surveyId, questionIndex }: AudioRecorderProps) {
+export function AudioRecorder({ onRecordingComplete, existingRecording, questionIndex = 0 }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(existingRecording || null)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const [playbackTime, setPlaybackTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(existingRecording || null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const recordingStartTimeRef = useRef<number>(0)
 
+  // Reset state when question changes
   useEffect(() => {
-    return () => {
-      // Cleanup on unmount
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop())
-      }
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
+    setAudioBlob(existingRecording || null)
+    setRecordingTime(0)
+    setPlaybackTime(0)
+    setDuration(0)
+    setIsRecording(false)
+    setIsPlaying(false)
+
+    // Clean up intervals
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current)
     }
-  }, [])
+    if (playbackIntervalRef.current) {
+      clearInterval(playbackIntervalRef.current)
+    }
+  }, [questionIndex, existingRecording])
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
 
   const startRecording = async () => {
     try {
-      setError(null)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: "audio/webm;codecs=opus",
       })
-      mediaRecorderRef.current = mediaRecorder
 
-      const chunks: BlobPart[] = []
+      const chunks: Blob[] = []
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -55,25 +64,38 @@ export function AudioRecorder({ onRecordingComplete, existingRecording, surveyId
       }
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "audio/webm" })
-        setAudioBlob(blob)
-        onRecordingComplete?.(blob)
+        const blob = new Blob(chunks, { type: "audio/webm;codecs=opus" })
+        const finalDuration = (Date.now() - recordingStartTimeRef.current) / 1000
 
-        // Stop all tracks
+        setAudioBlob(blob)
+        setDuration(finalDuration)
+        onRecordingComplete(blob, finalDuration)
+
+        // Stop all tracks to release microphone
         stream.getTracks().forEach((track) => track.stop())
+
+        console.log("Recording completed:", {
+          duration: finalDuration,
+          blobSize: blob.size,
+          questionIndex,
+        })
       }
 
-      mediaRecorder.start()
+      mediaRecorderRef.current = mediaRecorder
+      recordingStartTimeRef.current = Date.now()
+
+      mediaRecorder.start(100) // Collect data every 100ms
       setIsRecording(true)
       setRecordingTime(0)
 
-      // Start timer
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1)
-      }, 1000)
-    } catch (err) {
-      console.error("Error starting recording:", err)
-      setError("Failed to access microphone. Please check permissions.")
+      // Update recording time every 100ms for smooth display
+      recordingIntervalRef.current = setInterval(() => {
+        const elapsed = (Date.now() - recordingStartTimeRef.current) / 1000
+        setRecordingTime(elapsed)
+      }, 100)
+    } catch (error) {
+      console.error("Error starting recording:", error)
+      alert("Could not access microphone. Please check permissions.")
     }
   }
 
@@ -82,107 +104,161 @@ export function AudioRecorder({ onRecordingComplete, existingRecording, surveyId
       mediaRecorderRef.current.stop()
       setIsRecording(false)
 
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current)
+        recordingIntervalRef.current = null
       }
     }
   }
 
   const playRecording = () => {
-    if (audioBlob) {
+    if (audioBlob && !isPlaying) {
       const audioUrl = URL.createObjectURL(audioBlob)
       const audio = new Audio(audioUrl)
       audioRef.current = audio
 
+      audio.onloadedmetadata = () => {
+        setDuration(audio.duration || duration)
+      }
+
+      audio.onplay = () => {
+        setIsPlaying(true)
+        setPlaybackTime(0)
+
+        // Update playback time
+        playbackIntervalRef.current = setInterval(() => {
+          if (audio.currentTime) {
+            setPlaybackTime(audio.currentTime)
+          }
+        }, 100)
+      }
+
+      audio.onpause = () => {
+        setIsPlaying(false)
+        if (playbackIntervalRef.current) {
+          clearInterval(playbackIntervalRef.current)
+        }
+      }
+
       audio.onended = () => {
         setIsPlaying(false)
+        setPlaybackTime(0)
+        if (playbackIntervalRef.current) {
+          clearInterval(playbackIntervalRef.current)
+        }
         URL.revokeObjectURL(audioUrl)
       }
 
-      audio.play()
-      setIsPlaying(true)
+      audio.play().catch((error) => {
+        console.error("Error playing audio:", error)
+        setIsPlaying(false)
+      })
     }
   }
 
-  const pausePlayback = () => {
-    if (audioRef.current) {
+  const pauseRecording = () => {
+    if (audioRef.current && isPlaying) {
       audioRef.current.pause()
-      setIsPlaying(false)
     }
   }
 
   const resetRecording = () => {
     setAudioBlob(null)
     setRecordingTime(0)
+    setPlaybackTime(0)
+    setDuration(0)
+    setIsRecording(false)
     setIsPlaying(false)
-    setError(null)
 
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current)
+    }
+    if (playbackIntervalRef.current) {
+      clearInterval(playbackIntervalRef.current)
+    }
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
     }
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current)
+      }
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current)
+      }
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+    }
+  }, [])
 
   return (
-    <div className="flex flex-col items-center space-y-4 p-6 bg-gray-50 rounded-lg">
-      {error && <div className="text-red-600 text-sm text-center mb-4">{error}</div>}
+    <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg border border-gray-200">
+      <div className="text-center space-y-4">
+        {/* Recording Status */}
+        <div className="h-16 flex items-center justify-center">
+          {isRecording ? (
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-lg font-mono text-red-600">Recording: {formatTime(recordingTime)}</span>
+            </div>
+          ) : audioBlob ? (
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              <span className="text-lg font-mono text-green-600">
+                {isPlaying ? `Playing: ${formatTime(playbackTime)}` : `Ready: ${formatTime(duration)}`}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+              <span className="text-lg font-mono text-gray-600">Ready to record</span>
+            </div>
+          )}
+        </div>
 
-      {/* Recording Controls */}
-      <div className="flex items-center space-x-4">
-        {!isRecording && !audioBlob && (
-          <Button onClick={startRecording} className="bg-red-500 hover:bg-red-600 text-white rounded-full w-16 h-16">
-            <Mic className="w-6 h-6" />
-          </Button>
-        )}
-
-        {isRecording && (
-          <Button
-            onClick={stopRecording}
-            className="bg-red-600 hover:bg-red-700 text-white rounded-full w-16 h-16 animate-pulse"
-          >
-            <Square className="w-6 h-6" />
-          </Button>
-        )}
-
-        {audioBlob && !isRecording && (
-          <div className="flex items-center space-x-2">
+        {/* Control Buttons */}
+        <div className="flex justify-center space-x-3">
+          {!audioBlob ? (
             <Button
-              onClick={isPlaying ? pausePlayback : playRecording}
-              className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-12 h-12"
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`w-16 h-16 rounded-full ${
+                isRecording ? "bg-red-500 hover:bg-red-600" : "bg-indigo-500 hover:bg-indigo-600"
+              } text-white`}
             >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {isRecording ? <Square className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
             </Button>
+          ) : (
+            <>
+              <Button
+                onClick={isPlaying ? pauseRecording : playRecording}
+                className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white"
+              >
+                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              </Button>
+              <Button
+                onClick={resetRecording}
+                className="w-12 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </Button>
+            </>
+          )}
+        </div>
 
-            <Button onClick={resetRecording} variant="outline" className="rounded-full w-12 h-12">
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Recording Status */}
-      <div className="text-center">
-        {isRecording && <div className="text-red-600 font-medium">Recording... {formatTime(recordingTime)}</div>}
-
-        {audioBlob && !isRecording && (
-          <div className="text-green-600 font-medium">✓ Recording complete ({formatTime(recordingTime)})</div>
-        )}
-
-        {!isRecording && !audioBlob && <div className="text-gray-500">Tap the microphone to start recording</div>}
-      </div>
-
-      {/* Instructions */}
-      <div className="text-xs text-gray-500 text-center max-w-xs">
-        {!audioBlob
-          ? "Click the red button to start recording your response"
-          : "Use the play button to review your recording, or the reset button to record again"}
+        {/* Instructions */}
+        <div className="text-sm text-gray-600">
+          {!audioBlob
+            ? isRecording
+              ? "Click the square to stop recording"
+              : "Click the microphone to start recording"
+            : "Click play to listen or reset to record again"}
+        </div>
       </div>
     </div>
   )
