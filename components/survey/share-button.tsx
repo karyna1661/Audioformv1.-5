@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Copy, Check } from "lucide-react"
+import { Copy, Check } from 'lucide-react'
 import { toast } from "sonner"
 
 interface ShareButtonProps {
@@ -15,12 +15,9 @@ export function ShareButton({ surveyId, surveyTitle, className }: ShareButtonPro
   const [copied, setCopied] = useState(false)
 
   const handleShare = async () => {
-    // Get the base URL from environment or current window
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "")
-
-    // Clean the base URL and create the share URL
-    const cleanBaseUrl = baseUrl.trim().replace(/\/$/, "")
-    const shareUrl = `${cleanBaseUrl}/respond/${surveyId.trim()}`
+    // Use the correct domain
+    const baseUrl = "https://voxera.vercel.app"
+    const shareUrl = `${baseUrl}/respond/${surveyId.trim()}`
 
     console.log("Sharing URL:", shareUrl) // Debug log
 
@@ -37,7 +34,10 @@ export function ShareButton({ surveyId, surveyTitle, className }: ShareButtonPro
   }
 
   return (
-    <Button onClick={handleShare} className={className}>
+    <Button 
+      onClick={handleShare} 
+      className={`bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white ${className}`}
+    >
       {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
       {copied ? "Copied!" : "Copy Survey Link"}
     </Button>

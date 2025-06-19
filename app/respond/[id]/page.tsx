@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
 import { AudioRecorder } from "@/components/AudioRecorder"
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Button } from "@/components/ui/button"
 import type { Database } from "@/types/database.types"
 
 type Survey = Database["public"]["Tables"]["surveys"]["Row"] & {
@@ -24,6 +26,7 @@ export default function RespondPage({ params: { id } }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [responses, setResponses] = useState<{ [key: number]: Blob }>({})
+  const [responseCount, setResponseCount] = useState(0)
 
   useEffect(() => {
     async function loadSurvey() {
@@ -55,6 +58,7 @@ export default function RespondPage({ params: { id } }: Props) {
         }
 
         setSurvey(data as Survey)
+        setResponseCount(data.responses?.length || 0)
 
         // Parse questions - handle both string and object formats
         const parsedQuestions = Array.isArray(data.questions)
@@ -74,6 +78,31 @@ export default function RespondPage({ params: { id } }: Props) {
 
     if (id) {
       loadSurvey()
+    }
+  }, [id])
+
+  // Set up real-time response counter
+  useEffect(() => {
+    if (!id) return
+
+    const channel = supabase
+      .channel(`survey-${id}-responses`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "responses",
+          filter: `survey_id=eq.${id}`,
+        },
+        () => {
+          setResponseCount((prev) => prev + 1)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
   }, [id])
 
@@ -143,12 +172,12 @@ export default function RespondPage({ params: { id } }: Props) {
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Survey Unavailable</h1>
           <p className="text-gray-600 mb-6">{error}</p>
-          <button
+          <Button
             onClick={() => router.push("/")}
-            className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
           >
             Return Home
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -159,12 +188,12 @@ export default function RespondPage({ params: { id } }: Props) {
       <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
         <div className="text-center">
           <p className="text-gray-600">Survey not found</p>
-          <button
+          <Button
             onClick={() => router.push("/")}
-            className="mt-4 px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            className="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
           >
             Return Home
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -184,11 +213,11 @@ export default function RespondPage({ params: { id } }: Props) {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{survey.title}</h1>
           {survey.description && <p className="text-gray-600 mb-4">{survey.description}</p>}
 
-          {/* Response Count */}
+          {/* Real-time Response Count */}
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span>
-              {survey.responses?.length || 0} response{(survey.responses?.length || 0) !== 1 ? "s" : ""}
+              {responseCount} response{responseCount !== 1 ? "s" : ""}
             </span>
           </div>
         </div>
@@ -208,7 +237,7 @@ export default function RespondPage({ params: { id } }: Props) {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
-                  className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                  className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
                 ></div>
               </div>
@@ -217,7 +246,11 @@ export default function RespondPage({ params: { id } }: Props) {
                   <div
                     key={index}
                     className={`w-2 h-2 rounded-full ${
-                      index === currentIndex ? "bg-indigo-600" : index < currentIndex ? "bg-green-500" : "bg-gray-300"
+                      index === currentIndex 
+                        ? "bg-indigo-600" 
+                        : index < currentIndex 
+                          ? "bg-green-500" 
+                          : "bg-gray-300"
                     }`}
                   />
                 ))}
@@ -230,37 +263,45 @@ export default function RespondPage({ params: { id } }: Props) {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{questionText}</h2>
           </div>
 
-          {/* Audio Recorder */}
+          {/* Audio Recorder - Key prop forces re-render on question change */}
           <div className="mb-6">
-            <AudioRecorder onRecordingComplete={handleRecordingComplete} existingRecording={responses[currentIndex]} />
+            <AudioRecorder 
+              key={currentIndex} // This forces component re-render
+              onRecordingComplete={handleRecordingComplete} 
+              existingRecording={responses[currentIndex]}
+              questionIndex={currentIndex}
+            />
           </div>
 
           {/* Navigation Buttons */}
           <div className="flex justify-between gap-4">
-            <button
+            <Button
               onClick={handlePrevious}
               disabled={currentIndex === 0}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="outline"
+              className="flex items-center gap-2 border-indigo-200 hover:bg-indigo-50 text-indigo-600"
             >
+              <ChevronLeft className="w-4 h-4" />
               Previous
-            </button>
+            </Button>
 
             {currentIndex === questions.length - 1 ? (
-              <button
+              <Button
                 onClick={handleSubmit}
                 disabled={!responses[currentIndex]}
-                className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white flex items-center gap-2"
               >
                 Submit Survey
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 onClick={handleNext}
                 disabled={!responses[currentIndex]}
-                className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white flex items-center gap-2"
               >
                 Continue
-              </button>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
             )}
           </div>
         </div>
