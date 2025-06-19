@@ -7,6 +7,7 @@ export interface Database {
         Row: {
           id: string
           title: string
+          type?: string
           questions: Json
           created_at: string
           expires_at: string | null
@@ -16,6 +17,7 @@ export interface Database {
         Insert: {
           id?: string
           title: string
+          type?: string
           questions: Json
           created_at?: string
           expires_at?: string | null
@@ -29,7 +31,9 @@ export interface Database {
           id: string
           survey_id: string
           question_id: string
+          question_index?: number
           audio_url: string | null
+          audio_path: string | null
           response_text: string | null
           created_at: string
           user_id: string | null
@@ -38,7 +42,9 @@ export interface Database {
           id?: string
           survey_id: string
           question_id: string
+          question_index?: number
           audio_url?: string | null
+          audio_path?: string | null
           response_text?: string | null
           created_at?: string
           user_id?: string | null
@@ -50,15 +56,21 @@ export interface Database {
           id: string
           survey_id: string
           email: string | null
+          started_at: string | null
           created_at: string
           expires_at: string
+          notified: boolean | null
+          user_id: string | null
         }
         Insert: {
           id?: string
           survey_id: string
           email?: string | null
+          started_at?: string | null
           created_at?: string
           expires_at: string
+          notified?: boolean | null
+          user_id?: string | null
         }
         Update: Partial<Database["public"]["Tables"]["demo_sessions"]["Insert"]>
       }
