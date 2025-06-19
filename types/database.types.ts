@@ -3,26 +3,45 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
+      users: {
+        Row: {
+          id: string
+          email: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>
+      }
       surveys: {
         Row: {
           id: string
           title: string
-          type?: string
+          type: string
           questions: Json
           created_at: string
           expires_at: string | null
           is_active: boolean
           user_id: string | null
+          settings: Json | null
+          metadata: Json | null
         }
         Insert: {
           id?: string
           title: string
-          type?: string
+          type: string
           questions: Json
           created_at?: string
           expires_at?: string | null
           is_active?: boolean
           user_id?: string | null
+          settings?: Json | null
+          metadata?: Json | null
         }
         Update: Partial<Database["public"]["Tables"]["surveys"]["Insert"]>
       }
@@ -31,23 +50,27 @@ export interface Database {
           id: string
           survey_id: string
           question_id: string
-          question_index?: number
+          question_index: number | null
+          audio_path: string
           audio_url: string | null
-          audio_path: string | null
-          response_text: string | null
+          transcript: string | null
+          sentiment_score: number | null
           created_at: string
           user_id: string | null
+          metadata: Json | null
         }
         Insert: {
           id?: string
           survey_id: string
           question_id: string
-          question_index?: number
+          question_index?: number | null
+          audio_path: string
           audio_url?: string | null
-          audio_path?: string | null
-          response_text?: string | null
+          transcript?: string | null
+          sentiment_score?: number | null
           created_at?: string
           user_id?: string | null
+          metadata?: Json | null
         }
         Update: Partial<Database["public"]["Tables"]["responses"]["Insert"]>
       }
@@ -56,21 +79,21 @@ export interface Database {
           id: string
           survey_id: string
           email: string | null
-          started_at: string | null
-          created_at: string
+          started_at: string
           expires_at: string
-          notified: boolean | null
+          notified: boolean
           user_id: string | null
+          created_at: string
         }
         Insert: {
           id?: string
           survey_id: string
           email?: string | null
-          started_at?: string | null
-          created_at?: string
+          started_at?: string
           expires_at: string
-          notified?: boolean | null
+          notified?: boolean
           user_id?: string | null
+          created_at?: string
         }
         Update: Partial<Database["public"]["Tables"]["demo_sessions"]["Insert"]>
       }

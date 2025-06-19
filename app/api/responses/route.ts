@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { SurveyService } from "@/lib/services/survey-service"
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,54 +7,32 @@ export async function POST(request: NextRequest) {
     const audio = formData.get("audio") as File
     const surveyId = formData.get("surveyId") as string
     const questionId = formData.get("questionId") as string
+    const questionIndex = Number.parseInt(formData.get("questionIndex") as string) || 0
 
-    if (!audio || !surveyId) {
+    if (!audio || !surveyId || !questionId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     console.log(`Processing response for survey ${surveyId}, question ${questionId}`)
 
-    // Initialize Supabase client with service role key
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    // Convert File to Blob
+    const audioBlob = new Blob([await audio.arrayBuffer()], { type: audio.type })
 
-    // Upload to demo-audio bucket with correct path structure
-    const filename = `responses/${surveyId}/${questionId}_${Date.now()}.webm`
-    const { data: uploadData, error: uploadError } = await supabase.storage.from("demo-audio").upload(filename, audio, {
-      cacheControl: "3600",
-      upsert: true,
+    // Save response using the service
+    const response = await SurveyService.saveResponse({
+      surveyId,
+      questionId,
+      questionIndex,
+      audioBlob,
+      userId: null, // Anonymous for now
     })
 
-    if (uploadError) {
-      console.error("Storage upload error:", uploadError)
-      return NextResponse.json({ error: uploadError.message }, { status: 500 })
-    }
+    console.log("Response submitted successfully:", response.id)
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage.from("demo-audio").getPublicUrl(filename)
-
-    // Save response record to database
-    const { data: responseData, error: dbError } = await supabase
-      .from("responses")
-      .insert({
-        survey_id: surveyId,
-        question_id: questionId,
-        audio_path: uploadData.path,
-        audio_url: publicUrlData.publicUrl,
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      console.error("Database insert error:", dbError)
-      return NextResponse.json({ error: dbError.message }, { status: 500 })
-    }
-
-    console.log("Response submitted successfully:", responseData)
     return NextResponse.json({
       success: true,
-      responseId: responseData.id,
-      audioUrl: publicUrlData.publicUrl,
+      responseId: response.id,
+      audioUrl: response.audio_url,
     })
   } catch (error: any) {
     console.error("Response upload error:", error)
