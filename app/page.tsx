@@ -200,7 +200,7 @@ export default function HomePage() {
                 <span className="text-sm sm:text-base font-semibold text-gray-900">Audioform</span>
               </div>
               <p className="text-xs sm:text-sm text-gray-600 text-center">
-                © 2025 Audioform. Built for authentic conversations.
+                © 2024 Audioform. Built for authentic conversations.
               </p>
             </div>
           </div>

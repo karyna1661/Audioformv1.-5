@@ -39,11 +39,10 @@ export async function createSurvey(topic: string) {
       {
         id: "1",
         text: topic.trim(),
-        order: 1,
       },
     ]
 
-    // Create the survey - removed description field
+    // Create the survey
     const surveyData = {
       title: topic.trim(),
       type: "demo",
@@ -98,7 +97,6 @@ export async function createSurvey(topic: string) {
     // Revalidate relevant paths
     revalidatePath("/dashboard")
     revalidatePath("/demo")
-    revalidatePath("/surveys")
 
     return { demoId: survey.id }
   } catch (error) {

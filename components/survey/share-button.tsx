@@ -2,66 +2,46 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Share2, Copy, MessageCircle } from "lucide-react"
+import { Copy, Check } from "lucide-react"
 import { toast } from "sonner"
-import { createSurveyUrl } from "@/lib/utils/url"
-import { useFarcasterShare } from "@/hooks/useFarcasterShare"
 
 interface ShareButtonProps {
   surveyId: string
-  surveyTitle?: string
+  surveyTitle: string
+  className?: string
 }
 
-export function ShareButton({ surveyId, surveyTitle = "Check out this survey" }: ShareButtonProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const { shareToFarcaster, isSharing } = useFarcasterShare()
+export function ShareButton({ surveyId, surveyTitle, className }: ShareButtonProps) {
+  const [copied, setCopied] = useState(false)
 
-  const surveyUrl = createSurveyUrl(surveyId)
+  const handleShare = async () => {
+    // Get the base URL from environment or current window
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "")
 
-  const copyToClipboard = async () => {
+    // Clean the base URL and create the share URL
+    const cleanBaseUrl = baseUrl.trim().replace(/\/$/, "")
+    const shareUrl = `${cleanBaseUrl}/respond/${surveyId.trim()}`
+
+    console.log("Sharing URL:", shareUrl) // Debug log
+
     try {
-      await navigator.clipboard.writeText(surveyUrl)
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
       toast.success("Survey link copied to clipboard!")
-      setIsOpen(false)
+
+      setTimeout(() => setCopied(false), 2000)
     } catch (error) {
-      console.error("Failed to copy to clipboard:", error)
+      console.error("Failed to copy:", error)
       toast.error("Failed to copy link")
     }
   }
 
-  const handleFarcasterShare = async () => {
-    const result = await shareToFarcaster({
-      text: `${surveyTitle} - Share your thoughts!`,
-      url: surveyUrl,
-    })
-
-    if (result.success) {
-      toast.success("Opening Farcaster...")
-      setIsOpen(false)
-    } else {
-      toast.error("Failed to share to Farcaster")
-    }
-  }
-
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Share2 className="h-4 w-4 mr-2" />
-          Share Survey
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onClick={copyToClipboard}>
-          <Copy className="h-4 w-4 mr-2" />
-          Copy Link
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleFarcasterShare} disabled={isSharing}>
-          <MessageCircle className="h-4 w-4 mr-2" />
-          {isSharing ? "Sharing..." : "Share on Farcaster"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button onClick={handleShare} className={className}>
+      {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+      {copied ? "Copied!" : "Copy Survey Link"}
+    </Button>
   )
 }
+
+export default ShareButton
